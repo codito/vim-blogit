@@ -182,7 +182,7 @@ class BlogIt:
 
         post = {'title': self.getMeta('Subject'),
                 'wp_author_display_name': self.getMeta('From'),
-                'categories': [self.getMeta('Categories').split(',')],
+                'categories': self.getMeta('Categories').split(','),
                 'mt_keywords': self.getMeta('Tags'),
                 'description': '\n'.join(vim.current.buffer[start_text:])
                }

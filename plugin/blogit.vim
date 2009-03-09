@@ -44,7 +44,7 @@ command! -nargs=+ Blogit exec('py blogit.command(<f-args>)')
 
 python <<EOF
 # -*- coding: utf-8 -*-
-import urllib , urllib2 , vim , xml.dom.minidom , xmlrpclib , sys , string , re
+import vim, xmlrpclib, sys, re
 from types import MethodType
 
 #####################

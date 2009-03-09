@@ -14,9 +14,9 @@
 " Foundation, Inc., 59 Temple Place - Suite 330, Boston, MA 02111-1307, USA.
 "
 " Maintainer:	Romain Bignon
-" URL:		http://dev.peerfuse.org
+" URL:		http://dev.peerfuse.org/wiki/blogit
 " Version:	0.1
-" Last Change:  2009 March 08
+" Last Change:  2009 March 09
 "
 " Commands :
 " ":Blogit ls"

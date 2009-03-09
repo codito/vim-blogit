@@ -174,7 +174,7 @@ class BlogIt:
 
     def sendArticle(self, push=0):
         vim.command('set nomodified')
-        start_text = 1
+        start_text = 0
         for line in vim.current.buffer:
             start_text += 1
             if line == '':

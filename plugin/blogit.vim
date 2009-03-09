@@ -30,6 +30,12 @@
 "   Saves the article to the blog
 " ":Blogit push"
 "   Publish article
+" ":Blogit rm <id>"
+"   Remove an article
+" ":Blogit categories"
+"   Show categories list
+" ":Blogit help"
+"   Display help
 "
 " Configuration :
 "   Edit the "Settings" section

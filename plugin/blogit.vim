@@ -179,7 +179,7 @@ class BlogIt:
             return
 
         push = 0
-        if self.post['post_status'] == 'publish':
+        if self.current_post['post_status'] == 'publish':
             push = 1
         self.sendArticle(push=push)
 
@@ -213,7 +213,7 @@ class BlogIt:
         if datetime == '':
             post['dateCreated'] = DateTime()
         else:
-            post['dateCreated'] = datetime
+            post['dateCreated'] = DateTime(datetime)
 
         strid = self.getMeta('Post-Id')
 

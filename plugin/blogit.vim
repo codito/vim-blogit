@@ -208,7 +208,7 @@ class BlogIt:
         post['wp_author_display_name'] = self.getMeta('From')
         post['categories'] = self.getMeta('Categories').split(',')
         post['mt_keywords'] = self.getMeta('Tags')
-        post['description'] = '\n'.join(vim.current.buffer[start_text:]
+        post['description'] = '\n'.join(vim.current.buffer[start_text:])
         datetime = self.getMeta('Date')
         if datetime == '':
             post['dateCreated'] = DateTime()

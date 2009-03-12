@@ -118,6 +118,12 @@ class BlogIt:
 
     def command_edit(self, id):
         try:
+            id = int(id)
+        except ValueError:
+            sys.stderr.write("'id' must be an integer value.")
+            return
+
+        try:
             post = self.client.metaWeblog.getPost(id, blog_username, blog_password)
             self.display_post(post)
         except Fault, e:

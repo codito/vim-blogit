@@ -15,8 +15,8 @@
 "
 " Maintainer:	Romain Bignon
 " URL:		http://dev.peerfuse.org/wiki/blogit
-" Version:	0.1
-" Last Change:  2009 March 09
+" Version:	0.9
+" Last Change:  2009 March 13
 "
 " Commands :
 " ":Blogit ls"
@@ -29,6 +29,8 @@
 "   Saves the article to the blog
 " ":Blogit push"
 "   Publish article
+" ":Blogit unpush"
+"   Unpublish article
 " ":Blogit rm <id>"
 "   Remove an article
 " ":Blogit categories"
@@ -50,6 +52,7 @@ command! -nargs=+ Blogit exec('py blogit.command(<f-args>)')
 python <<EOF
 # -*- coding: utf-8 -*-
 import vim, xmlrpclib, sys, re
+from xmlrpclib import DateTime
 from types import MethodType
 
 #####################
@@ -68,6 +71,7 @@ class BlogIt:
 
     def __init__(self):
         self.client = xmlrpclib.ServerProxy(blog_url)
+        self.current_post = None
 
     def command(self, command, *args):
         commands = self.getMethods('command_')
@@ -82,6 +86,7 @@ class BlogIt:
         sys.stdout.write("   Blogit edit <id>       edit a post\n")
         sys.stdout.write("   Blogit commit          commit current post\n")
         sys.stdout.write("   Blogit push            publish post\n")
+        sys.stdout.write("   Blogit unpush          unpublish post\n")
         sys.stdout.write("   Blogit rm <id>         remove a post\n")
         sys.stdout.write("   Blogit categories      list categories\n")
         sys.stdout.write("   Blogit help            display this notice\n")
@@ -96,6 +101,7 @@ class BlogIt:
             formatter = '%%%dd\t%%s\t%%s' % len(allposts[0]['postid'])
             del vim.current.buffer[:]
             vim.command("set syntax=blogsyntax")
+            self.current_post = None
             vim.current.buffer[0] = "ID\tDate             \tTitle"
             for p in allposts:
                 vim.current.buffer.append(formatter % (int(p['postid']), p['dateCreated'], p['title'].encode('utf-8')))
@@ -142,6 +148,7 @@ class BlogIt:
         vim.current.window.cursor = (8, 0)
         vim.command('set nomodified')
         vim.command('set textwidth=0')
+        self.current_post = post
 
     def getMeta(self, name):
         n = self.getLine(name)
@@ -167,10 +174,26 @@ class BlogIt:
         return 0
 
     def command_commit(self):
-        self.sendArticle()
+        if self.current_post is None:
+            sys.stderr.write("Not editing any post.")
+            return
+
+        push = 0
+        if self.post['post_status'] == 'publish':
+            push = 1
+        self.sendArticle(push=push)
 
     def command_push(self):
+        if self.current_post is None:
+            sys.stderr.write("Not editing any post.")
+            return
         self.sendArticle(push=1)
+
+    def command_unpush(self):
+        if self.current_post is None:
+            sys.stderr.write("Not editing any post.")
+            return
+        self.sendArticle(push=0)
 
     def sendArticle(self, push=0):
         vim.command('set nomodified')
@@ -180,12 +203,17 @@ class BlogIt:
             if line == '':
                 break
 
-        post = {'title': self.getMeta('Subject'),
-                'wp_author_display_name': self.getMeta('From'),
-                'categories': self.getMeta('Categories').split(','),
-                'mt_keywords': self.getMeta('Tags'),
-                'description': '\n'.join(vim.current.buffer[start_text:])
-               }
+        post = self.current_post
+        post['title'] = self.getMeta('Subject')
+        post['wp_author_display_name'] = self.getMeta('From')
+        post['categories'] = self.getMeta('Categories').split(',')
+        post['mt_keywords'] = self.getMeta('Tags')
+        post['description'] = '\n'.join(vim.current.buffer[start_text:]
+        datetime = self.getMeta('Date')
+        if datetime == '':
+            post['dateCreated'] = DateTime()
+        else:
+            post['dateCreated'] = datetime
 
         strid = self.getMeta('Post-Id')
 
@@ -194,6 +222,7 @@ class BlogIt:
                                                    blog_password, post, push)
 
             vim.current.buffer[self.getLine('Post-Id')] = "Post-Id: %s" % strid
+            vim.current.buffer[self.getLine('Date')] = "Date: %s" % post['dateCreated']
         else:
             self.client.metaWeblog.editPost(strid, blog_username,
                                             blog_password, post, push)

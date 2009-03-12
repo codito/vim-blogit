@@ -128,7 +128,8 @@ class BlogIt:
                            'categories': '',
                            'mt_keywords': '',
                            'dateCreated': '',
-                           'description': ''
+                           'description': '',
+                           'post_status': 'draft',
                            })
 
     def display_post(self, post):
@@ -209,11 +210,17 @@ class BlogIt:
         post['categories'] = self.getMeta('Categories').split(',')
         post['mt_keywords'] = self.getMeta('Tags')
         post['description'] = '\n'.join(vim.current.buffer[start_text:])
+
         datetime = self.getMeta('Date')
         if datetime == '':
             post['dateCreated'] = DateTime()
         else:
             post['dateCreated'] = DateTime(datetime)
+
+        if push:
+            post['post_status'] = 'publish'
+        else:
+            post['post_status'] = 'draft'
 
         strid = self.getMeta('Post-Id')
 

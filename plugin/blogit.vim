@@ -15,7 +15,7 @@
 "
 " Maintainer:	Romain Bignon
 " URL:		http://dev.peerfuse.org/wiki/blogit
-" Version:	0.9
+" Version:	1.0
 " Last Change:  2009 March 13
 "
 " Commands :
@@ -52,7 +52,7 @@ command! -nargs=+ Blogit exec('py blogit.command(<f-args>)')
 python <<EOF
 # -*- coding: utf-8 -*-
 import vim, xmlrpclib, sys, re
-from xmlrpclib import DateTime
+from xmlrpclib import DateTime, Fault
 from types import MethodType
 
 #####################
@@ -117,8 +117,11 @@ class BlogIt:
         self.command('edit', int(id))
 
     def command_edit(self, id):
-        post = self.client.metaWeblog.getPost(id, blog_username, blog_password)
-        self.display_post(post)
+        try:
+            post = self.client.metaWeblog.getPost(id, blog_username, blog_password)
+            self.display_post(post)
+        except Fault, e:
+            sys.stderr.write(e.faultString)
 
     def command_new(self):
         username = self.client.blogger.getUserInfo('', blog_username, blog_password)['firstname']
@@ -197,47 +200,62 @@ class BlogIt:
         self.sendArticle(push=0)
 
     def sendArticle(self, push=0):
-        vim.command('set nomodified')
-        start_text = 0
-        for line in vim.current.buffer:
-            start_text += 1
-            if line == '':
-                break
+        try:
+            vim.command('set nomodified')
+            start_text = 0
+            for line in vim.current.buffer:
+                start_text += 1
+                if line == '':
+                    break
 
-        post = self.current_post
-        post['title'] = self.getMeta('Subject')
-        post['wp_author_display_name'] = self.getMeta('From')
-        post['categories'] = self.getMeta('Categories').split(',')
-        post['mt_keywords'] = self.getMeta('Tags')
-        post['description'] = '\n'.join(vim.current.buffer[start_text:])
+            post = self.current_post
+            post['title'] = self.getMeta('Subject')
+            post['wp_author_display_name'] = self.getMeta('From')
+            post['categories'] = self.getMeta('Categories').split(',')
+            post['mt_keywords'] = self.getMeta('Tags')
+            post['description'] = '\n'.join(vim.current.buffer[start_text:])
 
-        datetime = self.getMeta('Date')
-        if datetime == '':
-            post['dateCreated'] = DateTime()
-        else:
-            post['dateCreated'] = DateTime(datetime)
+            datetime = self.getMeta('Date')
+            if datetime == '':
+                post['dateCreated'] = DateTime()
+            else:
+                post['dateCreated'] = DateTime(datetime)
 
-        if push:
-            post['post_status'] = 'publish'
-        else:
-            post['post_status'] = 'draft'
+            if push:
+                post['post_status'] = 'publish'
+            else:
+                post['post_status'] = 'draft'
 
-        strid = self.getMeta('Post-Id')
+            strid = self.getMeta('Post-Id')
 
-        if strid == '':
-            strid = self.client.metaWeblog.newPost('', blog_username,
-                                                   blog_password, post, push)
+            if strid == '':
+                strid = self.client.metaWeblog.newPost('', blog_username,
+                                                       blog_password, post, push)
 
-            vim.current.buffer[self.getLine('Post-Id')] = "Post-Id: %s" % strid
-            vim.current.buffer[self.getLine('Date')] = "Date: %s" % post['dateCreated']
-        else:
-            self.client.metaWeblog.editPost(strid, blog_username,
-                                            blog_password, post, push)
+                vim.current.buffer[self.getLine('Post-Id')] = "Post-Id: %s" % strid
+                vim.current.buffer[self.getLine('Date')] = "Date: %s" % post['dateCreated']
+            else:
+                self.client.metaWeblog.editPost(strid, blog_username,
+                                                blog_password, post, push)
+        except Fault, e:
+            sys.stderr.write(e.faultString)
 
     def command_rm(self, id):
-        self.client.metaWeblog.deletePost('', id, blog_username, blog_password)
+        try:
+            id = int(id)
+        except ValueError:
+            sys.stderr.write("'id' must be an integer value.")
+            return
+
+        try:
+            self.client.metaWeblog.deletePost('', id, blog_username, blog_password)
+        except Fault, e:
+            sys.stderr.write(e.faultString)
+            return
         sys.stdout.write('Article removed')
-        del vim.current.buffer[:]
+        if self.current_post and int(self.current_post['postid']) == int(id):
+            del vim.current.buffer[:]
+            self.current_post = None
 
     def command_categories(self):
         cats = self.client.wp.getCategories('', blog_username, blog_password)

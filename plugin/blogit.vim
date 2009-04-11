@@ -236,7 +236,8 @@ class BlogIt:
             post['description'] = '\n'.join(vim.current.buffer[start_text:])
 
             datetime = self.getMeta('Date')
-            if datetime != '' and DateTime(datetime) > DateTime(self.nowstr()):
+            if datetime != '' and (self.current_post['post_status'] != 'draft' or \
+                                   DateTime(datetime) > DateTime(self.nowstr())):
                 post['date_created_gmt'] = DateTime(datetime)
             else:
                 post['date_created_gmt'] = DateTime(self.nowstr())
@@ -251,13 +252,11 @@ class BlogIt:
             if strid == '':
                 strid = self.client.metaWeblog.newPost('', blog_username,
                                                        blog_password, post, push)
-
-                post = self.client.metaWeblog.getPost(strid, blog_username, blog_password)
-                vim.current.buffer[self.getLine('Post-Id')] = "Post-Id: %s" % post['postid']
-                vim.current.buffer[self.getLine('Date')] = "Date: %s" % post['date_created_gmt']
             else:
                 self.client.metaWeblog.editPost(strid, blog_username,
                                                 blog_password, post, push)
+
+            self.display_post(self.client.metaWeblog.getPost(strid, blog_username, blog_password))
         except Fault, e:
             sys.stderr.write(e.faultString)
 

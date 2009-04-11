@@ -13,10 +13,10 @@
 " along with this program; if not, write to the Free Software
 " Foundation, Inc., 59 Temple Place - Suite 330, Boston, MA 02111-1307, USA.
 "
-" Maintainer:	Romain Bignon
-" URL:		http://dev.peerfuse.org/wiki/blogit
-" Version:	1.0
-" Last Change:  2009 March 13
+" Maintainer:   Romain Bignon
+" URL:          http://symlink.me/wiki/blogit
+" Version:      1.0.1
+" Last Change:  2009 April 11
 "
 " Commands :
 " ":Blogit ls"
@@ -62,6 +62,8 @@ from types import MethodType
 blog_username = 'user'
 blog_password = 'passwd'
 blog_url = 'http://example.com/xmlrpc.php'
+# enabled if blog has the tag plugin:
+have_tags = True
 
 #####################
 # Do not edit below #
@@ -72,6 +74,7 @@ class BlogIt:
     def __init__(self):
         self.client = xmlrpclib.ServerProxy(blog_url)
         self.current_post = None
+	self.haveTags = have_tags
 
     def command(self, command, *args):
         commands = self.getMethods('command_')
@@ -148,7 +151,8 @@ class BlogIt:
         vim.current.buffer.append('Post-Id: %s' % post['postid'])
         vim.current.buffer.append('Subject: %s' % post['title'].encode('utf-8'))
         vim.current.buffer.append('Categories: %s' % ",".join(post["categories"]).encode("utf-8"))
-        vim.current.buffer.append('Tags: %s' % post["mt_keywords"].encode("utf-8"))
+	if self.haveTags:
+		vim.current.buffer.append('Tags: %s' % post["mt_keywords"].encode("utf-8"))
         vim.current.buffer.append('Date: %s' % post['dateCreated'])
         vim.current.buffer.append('')
         content = post["description"].encode("utf-8")
@@ -218,7 +222,8 @@ class BlogIt:
             post['title'] = self.getMeta('Subject')
             post['wp_author_display_name'] = self.getMeta('From')
             post['categories'] = self.getMeta('Categories').split(',')
-            post['mt_keywords'] = self.getMeta('Tags')
+	    if self.haveTags:
+		    post['mt_keywords'] = self.getMeta('Tags')
             post['description'] = '\n'.join(vim.current.buffer[start_text:])
 
             datetime = self.getMeta('Date')

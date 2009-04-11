@@ -80,7 +80,13 @@ class BlogIt:
         commands = self.getMethods('command_')
         if not command in commands:
             sys.stderr.write("No such command: %s" % command)
-        commands[command](*args)
+        try:
+            commands[command](*args)
+        except TypeError, e:
+            try:
+                sys.stderr.write("Command %s takes %s arguments" % (command, int(str(e).split(' ')[3]) - 1))
+            except:
+                sys.stderr.write('%s' % e)
 
     def command_help(self):
         sys.stdout.write("Available commands:\n")

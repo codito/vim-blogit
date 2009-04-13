@@ -147,6 +147,7 @@ class BlogIt:
                            'mt_keywords': '',
                            'date_created_gmt': '',
                            'description': '',
+                           'mt_text_more': '',
                            'post_status': 'draft',
                            })
 
@@ -201,6 +202,10 @@ class BlogIt:
 
         return 0
 
+    def getText(self, start_text):
+        text = '\n'.join(vim.current.buffer[start_text:])
+        return text.split('\n<!--more-->\n\n')
+
     def command_commit(self):
         if self.current_post is None:
             sys.stderr.write("Not editing any post.")
@@ -241,7 +246,11 @@ class BlogIt:
             post['categories'] = self.getMeta('Categories').split(',')
             if self.haveTags:
                 post['mt_keywords'] = self.getMeta('Tags')
-            post['description'] = '\n'.join(vim.current.buffer[start_text:])
+
+            textl = self.getText(start_text)
+            post['description'] = textl[0]
+            if len(textl) > 1:
+                post['mt_text_more'] = textl[1]
 
             datetime = self.getMeta('Date')
             if datetime != '' and (self.current_post['post_status'] != 'draft' or \

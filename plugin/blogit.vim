@@ -165,6 +165,14 @@ class BlogIt:
         for line in content.split('\n'):
             vim.current.buffer.append(line)
 
+        if post['mt_text_more']:
+            vim.current.buffer.append('')
+            vim.current.buffer.append('<!--more-->')
+            vim.current.buffer.append('')
+            content = post["mt_text_more"].encode("utf-8")
+            for line in content.split('\n'):
+                vim.current.buffer.append(line)
+
         vim.current.window.cursor = (8, 0)
         vim.command('set nomodified')
         vim.command('set textwidth=0')

@@ -116,14 +116,17 @@ class BlogIt:
                 vim.current.buffer.append(formatter % (int(p['postid']), p['date_created_gmt'], p['title'].encode('utf-8')))
                 vim.command('set nomodified')
             vim.current.window.cursor = (2, 0)
-            vim.command('map <enter> :py blogit.list_edit()<cr>')
+            vim.command('noremap <enter> :py blogit.list_edit()<cr>')
         except Exception, err:
             sys.stderr.write("An error has occured: %s" % err)
 
     def list_edit(self):
-        row,col = vim.current.window.cursor
-        id = vim.current.buffer[row-1].split()[0]
-        self.command('edit', int(id))
+        try:
+            row,col = vim.current.window.cursor
+            id = vim.current.buffer[row-1].split()[0]
+            self.command('edit', int(id))
+        except Exception:
+            return
 
     def command_edit(self, id):
         try:

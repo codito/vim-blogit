@@ -70,14 +70,20 @@ from types import MethodType
 class BlogIt:
 
     def __init__(self):
-        self.client = xmlrpclib.ServerProxy(self.blog_url())
+        self.client = None
         self.current_post = None
         self.haveTags = self.have_tags()
+
+    def connect(self):
+        self.client = xmlrpclib.ServerProxy(self.blog_url())
 
     def command(self, command, *args):
         commands = self.getMethods('command_')
         if not command in commands:
             sys.stderr.write("No such command: %s" % command)
+            return
+        if not self.client:
+            self.connect()
         try:
             commands[command](*args)
         except TypeError, e:

@@ -39,7 +39,14 @@
 "   Display help
 "
 " Configuration :
-"   Edit the "Settings" section
+"   Create a file called passwords.vim somewhere in your 'runtimepath'
+"   (prefered location is "~/.vim/"). Don't forget to set the permissions so
+"   only you can read it. This file should include:
+"
+"       let blogit_username='Your blog username'
+"       let blogit_password='Your blog password. Not the API-key.'
+"       let blogit_url='http://your.path.to/xmlrpc.php'
+"       let have_tags=1
 "
 " Usage :
 "   Just fill in the blanks, do not modify the highlighted parts and everything
@@ -47,6 +54,7 @@
 "
 " vim: set et softtabstop=4 cinoptions=4 shiftwidth=4 ts=4 ai
 
+runtime! passwords.vim
 command! -nargs=+ Blogit exec('py blogit.command(<f-args>)')
 
 python <<EOF
@@ -56,25 +64,15 @@ from xmlrpclib import DateTime, Fault
 from types import MethodType
 
 #####################
-#      Settings     #
-#####################
-
-blog_username = 'user'
-blog_password = 'passwd'
-blog_url = 'http://example.com/xmlrpc.php'
-# enabled if blog has the tag plugin:
-have_tags = True
-
-#####################
 # Do not edit below #
 #####################
 
 class BlogIt:
 
     def __init__(self):
-        self.client = xmlrpclib.ServerProxy(blog_url)
+        self.client = xmlrpclib.ServerProxy(self.blog_url())
         self.current_post = None
-        self.haveTags = have_tags
+        self.haveTags = self.have_tags()
 
     def command(self, command, *args):
         commands = self.getMethods('command_')
@@ -102,7 +100,8 @@ class BlogIt:
 
     def command_ls(self):
         try:
-            allposts = self.client.metaWeblog.getRecentPosts('',blog_username, blog_password)
+            allposts = self.client.metaWeblog.getRecentPosts('',
+                    self.blog_username(), self.blog_password())
             if not allposts:
                 sys.stderr.write("There isn't any post")
                 return
@@ -136,13 +135,15 @@ class BlogIt:
             return
 
         try:
-            post = self.client.metaWeblog.getPost(id, blog_username, blog_password)
+            post = self.client.metaWeblog.getPost(id, self.blog_username(),
+                                                  self.blog_password())
             self.display_post(post)
         except Fault, e:
             sys.stderr.write(e.faultString)
 
     def command_new(self):
-        username = self.client.blogger.getUserInfo('', blog_username, blog_password)['firstname']
+        username = self.client.blogger.getUserInfo(
+                '', self.blog_username(), self.blog_password())['firstname']
         self.display_post({'wp_author_display_name': username,
                            'postid': '',
                            'title': '',
@@ -152,7 +153,7 @@ class BlogIt:
                            'description': '',
                            'mt_text_more': '',
                            'post_status': 'draft',
-                           })
+                         })
 
     def display_post(self, post):
         vim.command("set ft=mail")
@@ -270,13 +271,13 @@ class BlogIt:
             strid = self.getMeta('Post-Id')
 
             if strid == '':
-                strid = self.client.metaWeblog.newPost('', blog_username,
-                                                       blog_password, post, push)
+                strid = self.client.metaWeblog.newPost('', self.blog_username(),
+                                                       self.blog_password(), post, push)
             else:
-                self.client.metaWeblog.editPost(strid, blog_username,
-                                                blog_password, post, push)
+                self.client.metaWeblog.editPost(strid, self.blog_username(),
+                                                self.blog_password(), post, push)
 
-            self.display_post(self.client.metaWeblog.getPost(strid, blog_username, blog_password))
+            self.display_post(self.client.metaWeblog.getPost(strid, self.blog_username(), self.blog_password()))
         except Fault, e:
             sys.stderr.write(e.faultString)
 
@@ -288,7 +289,8 @@ class BlogIt:
             return
 
         try:
-            self.client.metaWeblog.deletePost('', id, blog_username, blog_password)
+            self.client.metaWeblog.deletePost('', id, self.blog_username(),
+                                              self.blog_password())
         except Fault, e:
             sys.stderr.write(e.faultString)
             return
@@ -298,10 +300,23 @@ class BlogIt:
             self.current_post = None
 
     def command_categories(self):
-        cats = self.client.wp.getCategories('', blog_username, blog_password)
+        cats = self.client.wp.getCategories('', self.blog_username(),
+                                            self.blog_password())
         sys.stdout.write('Categories:\n')
         for cat in cats:
             sys.stdout.write('  %s\n' % cat['categoryName'])
+
+    def blog_username(self):
+        return vim.eval('blogit_username')
+
+    def blog_password(self):
+        return vim.eval('blogit_password')
+
+    def blog_url(self):
+        return vim.eval('blogit_url')
+
+    def have_tags(self):
+        return vim.eval('have_tags')
 
     def getMethods(self, prefix):
         services = {}
@@ -314,5 +329,6 @@ class BlogIt:
             name = attrname[len(prefix):]
             services[name] = attr
         return services
+
 
 blogit = BlogIt()

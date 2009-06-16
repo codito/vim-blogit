@@ -82,7 +82,7 @@ class BlogIt:
         if not command in commands:
             sys.stderr.write("No such command: %s" % command)
             return
-        if not self.client:
+        if self.client is None:
             self.connect()
         try:
             commands[command](*args)

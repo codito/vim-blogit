@@ -322,7 +322,7 @@ class BlogIt:
         return vim.eval('blogit_url')
 
     def have_tags(self):
-        return vim.eval('have_tags')
+        return vim.eval("!exists('have_tags') || have_tags")
 
     def getMethods(self, prefix):
         services = {}

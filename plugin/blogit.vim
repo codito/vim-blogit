@@ -55,7 +55,7 @@
 " vim: set et softtabstop=4 cinoptions=4 shiftwidth=4 ts=4 ai
 
 runtime! passwords.vim
-command! -nargs=+ Blogit exec('py blogit.command(<f-args>)')
+command! -nargs=* Blogit exec('py blogit.command(<f-args>)')
 
 python <<EOF
 # -*- coding: utf-8 -*-
@@ -77,7 +77,7 @@ class BlogIt:
     def connect(self):
         self.client = xmlrpclib.ServerProxy(self.blog_url())
 
-    def command(self, command, *args):
+    def command(self, command='help', *args):
         if self.client is None:
             self.connect()
         try:

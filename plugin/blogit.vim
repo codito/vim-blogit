@@ -78,17 +78,16 @@ class BlogIt:
         self.client = xmlrpclib.ServerProxy(self.blog_url())
 
     def command(self, command, *args):
-        commands = self.getMethods('command_')
-        if not command in commands:
-            sys.stderr.write("No such command: %s" % command)
-            return
         if self.client is None:
             self.connect()
         try:
-            commands[command](*args)
+            getattr(self, 'command_' + command)(*args)
+        except AttributeError:
+            sys.stderr.write("No such command: %s" % command)
         except TypeError, e:
             try:
-                sys.stderr.write("Command %s takes %s arguments" % (command, int(str(e).split(' ')[3]) - 1))
+                sys.stderr.write("Command %s takes %s arguments" % \
+                        (command, int(str(e).split(' ')[3]) - 1))
             except:
                 sys.stderr.write('%s' % e)
 
@@ -323,18 +322,6 @@ class BlogIt:
 
     def have_tags(self):
         return vim.eval("!exists('have_tags') || have_tags")
-
-    def getMethods(self, prefix):
-        services = {}
-        for attrname in dir(self):
-            if not attrname.startswith(prefix):
-                continue
-            attr = getattr(self, attrname)
-            if not isinstance(attr, MethodType):
-                continue
-            name = attrname[len(prefix):]
-            services[name] = attr
-        return services
 
 
 blogit = BlogIt()

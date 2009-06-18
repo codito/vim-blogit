@@ -91,10 +91,9 @@ class BlogIt:
     def __init__(self):
         self.client = None
         self.current_post = None
-        self.haveTags = self.have_tags()
 
     def connect(self):
-        self.client = xmlrpclib.ServerProxy(self.blog_url())
+        self.client = xmlrpclib.ServerProxy(self.blog_url)
 
     def command(self, command='help', *args):
         if self.client is None:
@@ -125,7 +124,7 @@ class BlogIt:
     def command_ls(self):
         try:
             allposts = self.client.metaWeblog.getRecentPosts('',
-                    self.blog_username(), self.blog_password())
+                    self.blog_username, self.blog_password)
             if not allposts:
                 sys.stderr.write("There are no posts.")
                 return
@@ -168,7 +167,7 @@ class BlogIt:
 
     def command_new(self):
         username = self.client.blogger.getUserInfo(
-                '', self.blog_username(), self.blog_password())['firstname']
+                '', self.blog_username, self.blog_password)['firstname']
         self.display_post({'wp_author_display_name': username,
                            'postid': '',
                            'title': '',
@@ -187,7 +186,7 @@ class BlogIt:
         vim.current.buffer.append('Post-Id: %s' % post['postid'])
         vim.current.buffer.append('Subject: %s' % post['title'].encode('utf-8'))
         vim.current.buffer.append('Categories: %s' % ",".join(post["categories"]).encode("utf-8"))
-        if self.haveTags:
+        if self.have_tags:
             vim.current.buffer.append('Tags: %s' % post["mt_keywords"].encode("utf-8"))
         vim.current.buffer.append('Date: %s' % post['date_created_gmt'])
         vim.current.buffer.append('')
@@ -209,8 +208,8 @@ class BlogIt:
         self.current_post = post
 
     def getPost(self, id):
-        return self.client.metaWeblog.getPost(id, self.blog_username(),
-                                                  self.blog_password())
+        return self.client.metaWeblog.getPost(id, self.blog_username,
+                                                  self.blog_password)
 
     def getMeta(self, name):
         n = self.getLine(name)
@@ -295,7 +294,7 @@ class BlogIt:
             post['title'] = self.getMeta('Subject')
             post['wp_author_display_name'] = self.getMeta('From')
             post['categories'] = self.getMeta('Categories').split(',')
-            if self.haveTags:
+            if self.have_tags:
                 post['mt_keywords'] = self.getMeta('Tags')
 
             textl = self.getText(start_text)
@@ -318,11 +317,11 @@ class BlogIt:
             strid = self.getMeta('Post-Id')
 
             if strid == '':
-                strid = self.client.metaWeblog.newPost('', self.blog_username(),
-                                                       self.blog_password(), post, push)
+                strid = self.client.metaWeblog.newPost('', self.blog_username,
+                                                       self.blog_password, post, push)
             else:
-                self.client.metaWeblog.editPost(strid, self.blog_username(),
-                                                self.blog_password(), post, push)
+                self.client.metaWeblog.editPost(strid, self.blog_username,
+                                                self.blog_password, post, push)
             self.display_post(self.getPost(strid))
         except Fault, e:
             sys.stderr.write(e.faultString)
@@ -335,8 +334,8 @@ class BlogIt:
             return
 
         try:
-            self.client.metaWeblog.deletePost('', id, self.blog_username(),
-                                              self.blog_password())
+            self.client.metaWeblog.deletePost('', id, self.blog_username,
+                                              self.blog_password)
         except Fault, e:
             sys.stderr.write(e.faultString)
             return
@@ -346,21 +345,25 @@ class BlogIt:
             self.current_post = None
 
     def command_categories(self):
-        cats = self.client.wp.getCategories('', self.blog_username(),
-                                            self.blog_password())
+        cats = self.client.wp.getCategories('', self.blog_username,
+                                            self.blog_password)
         sys.stdout.write('Categories:\n')
         for cat in cats:
             sys.stdout.write('  %s\n' % cat['categoryName'])
 
+    @property
     def blog_username(self):
         return vim.eval('blogit_username')
 
+    @property
     def blog_password(self):
         return vim.eval('blogit_password')
 
+    @property
     def blog_url(self):
         return vim.eval('blogit_url')
 
+    @property
     def have_tags(self):
         return vim.eval("!exists('have_tags') || have_tags")
 

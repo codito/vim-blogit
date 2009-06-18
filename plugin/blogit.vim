@@ -40,27 +40,27 @@
 "
 " Configuration :
 "   Create a file called passwords.vim somewhere in your 'runtimepath'
-"   (prefered location is "~/.vim/"). Don't forget to set the permissions so
+"   (preferred location is "~/.vim/"). Don't forget to set the permissions so
 "   only you can read it. This file should include:
 "
-"       let blogit_username='Your blog username'
+"       let blogit_username='Your blog user name'
 "       let blogit_password='Your blog password. Not the API-key.'
 "       let blogit_url='http://your.path.to/xmlrpc.php'
 "
 "   In addition you can set these settings in your vimrc:
 "
-"       let blogit_unformat='pandoc -f html -t rst --reference-links'
-"       let blogit_format='pandoc -f rst -t html'
+"       let have_tags=0
+"
+"   This deactivates the use of tags. It is needed if your WordPress doesn't
+"   have the UTW-RPC[3] plugin installed (WordPress.com does).
+"
+"       let blogit_unformat='pandoc --from=html --to=rst --reference-links'
+"       let blogit_format='pandoc --from=rst --to=html'
 "
 "   The blogit_format and blogit_unformat each contain a shell command to 
 "   filter the blog entry text (no meta data) before a commit and after an 
-"   edit, repectivly. In the example we use pandoc[1] to edit the blog in
+"   edit, respectively. In the example we use pandoc[1] to edit the blog in
 "   reStructuredText[2].
-"
-"       let have_tags=0
-"
-"   This deactivates the use of tags. It is needed if your Wordpress doesn't
-"   have the UTW-RPC[3] plugin installed.
 "
 " Usage :
 "   Just fill in the blanks, do not modify the highlighted parts and everything
@@ -174,7 +174,7 @@ class BlogIt:
             post = self.getPost(id)
             self.display_post(post)
         except Fault, e:
-            sys.stderr.write(e.faultString)
+            sys.stderr.write('Blogit Fault: ' + e.faultString)
 
     def command_new(self):
         username = self.client.blogger.getUserInfo(

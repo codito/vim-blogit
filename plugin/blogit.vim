@@ -108,7 +108,7 @@ class BlogIt:
             allposts = self.client.metaWeblog.getRecentPosts('',
                     self.blog_username(), self.blog_password())
             if not allposts:
-                sys.stderr.write("There isn't any post")
+                sys.stderr.write("There isn't any post.")
                 return
 
             formatter = '%%%dd\t%%s\t%%s' % len(allposts[0]['postid'])
@@ -140,8 +140,7 @@ class BlogIt:
             return
 
         try:
-            post = self.client.metaWeblog.getPost(id, self.blog_username(),
-                                                  self.blog_password())
+            post = self.getPost(id)
             self.display_post(post)
         except Fault, e:
             sys.stderr.write(e.faultString)
@@ -187,6 +186,10 @@ class BlogIt:
         vim.command('set nomodified')
         vim.command('set textwidth=0')
         self.current_post = post
+
+    def getPost(self, id):
+        return self.client.metaWeblog.getPost(id, self.blog_username(),
+                                                  self.blog_password())
 
     def getMeta(self, name):
         n = self.getLine(name)
@@ -281,8 +284,7 @@ class BlogIt:
             else:
                 self.client.metaWeblog.editPost(strid, self.blog_username(),
                                                 self.blog_password(), post, push)
-
-            self.display_post(self.client.metaWeblog.getPost(strid, self.blog_username(), self.blog_password()))
+            self.display_post(self.getPost(strid))
         except Fault, e:
             sys.stderr.write(e.faultString)
 

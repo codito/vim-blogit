@@ -131,15 +131,16 @@ class BlogIt:
                 return
 
             formatter = '%%%dd\t%%s\t%%s' % len(allposts[0]['postid'])
-            del vim.current.buffer[:]
-            vim.command("set syntax=blogsyntax")
+            vim.command('botright new')
             self.current_post = None
             vim.current.buffer[0] = "ID\tDate             \tTitle"
             for p in allposts:
                 vim.current.buffer.append(formatter % (int(p['postid']), p['date_created_gmt'], p['title'].encode('utf-8')))
-                vim.command('set nomodified')
+            vim.command('setlocal buftype=nofile bufhidden=wipe nobuflisted ' +
+                    'noswapfile syntax=blogsyntax nomodifiable')
             vim.current.window.cursor = (2, 0)
-            vim.command('noremap <enter> :py blogit.list_edit()<cr>')
+            vim.command('nnoremap <buffer> <enter> :py blogit.list_edit()<cr>')
+            vim.command('nnoremap <buffer> gf :py blogit.list_edit()<cr>')
         except Exception, err:
             sys.stderr.write("An error has occured: %s" % err)
 
@@ -147,7 +148,8 @@ class BlogIt:
         try:
             row,col = vim.current.window.cursor
             id = vim.current.buffer[row-1].split()[0]
-            self.command('edit', int(id))
+            vim.command('close')
+            self.command_edit(int(id))
         except Exception:
             return
 
@@ -179,8 +181,8 @@ class BlogIt:
                          })
 
     def display_post(self, post):
+        vim.command('enew')
         vim.command("set ft=mail")
-        del vim.current.buffer[:]
         vim.current.buffer[0] = 'From: %s' % post['wp_author_display_name'].encode('utf-8')
         vim.current.buffer.append('Post-Id: %s' % post['postid'])
         vim.current.buffer.append('Subject: %s' % post['title'].encode('utf-8'))

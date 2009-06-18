@@ -46,7 +46,12 @@
 "       let blogit_username='Your blog username'
 "       let blogit_password='Your blog password. Not the API-key.'
 "       let blogit_url='http://your.path.to/xmlrpc.php'
+"
+"   In addition you can set these optional settings in your vimrc:
+"
 "       let have_tags=1
+"       let blogit_unformat='pandoc -f html -t rst --reference-links'
+"       let blogit_format='pandoc -f rst -t html'
 "
 " Usage :
 "   Just fill in the blanks, do not modify the highlighted parts and everything
@@ -60,6 +65,7 @@ command! -nargs=* Blogit exec('py blogit.command(<f-args>)')
 python <<EOF
 # -*- coding: utf-8 -*-
 import vim, xmlrpclib, sys, re, time, datetime
+from subprocess import Popen, CalledProcessError, PIPE
 from xmlrpclib import DateTime, Fault
 from types import MethodType
 
@@ -170,7 +176,7 @@ class BlogIt:
             vim.current.buffer.append('Tags: %s' % post["mt_keywords"].encode("utf-8"))
         vim.current.buffer.append('Date: %s' % post['date_created_gmt'])
         vim.current.buffer.append('')
-        content = post["description"].encode("utf-8")
+        content = self.unformat(post["description"].encode("utf-8"))
         for line in content.split('\n'):
             vim.current.buffer.append(line)
 
@@ -178,7 +184,7 @@ class BlogIt:
             vim.current.buffer.append('')
             vim.current.buffer.append('<!--more-->')
             vim.current.buffer.append('')
-            content = post["mt_text_more"].encode("utf-8")
+            content = self.unformat(post["mt_text_more"].encode("utf-8"))
             for line in content.split('\n'):
                 vim.current.buffer.append(line)
 
@@ -216,7 +222,25 @@ class BlogIt:
 
     def getText(self, start_text):
         text = '\n'.join(vim.current.buffer[start_text:])
-        return text.split('\n<!--more-->\n\n')
+        return map(self.format, text.split('\n<!--more-->\n\n'))
+
+    def unformat(self, text):
+        return self.format(text, 'blogit_unformat')
+
+    def format(self, text, vim_var='blogit_format'):
+        """ Filter text with command in vim_var."""
+        if not vim.eval('exists("%s")' % vim_var):
+            return text
+        try:
+            filter = vim.eval(vim_var)
+            p = Popen(filter, shell=True, stdin=PIPE, stdout=PIPE)
+            p.stdin.write(text)
+            p.stdin.close()
+            return p.stdout.read()
+        except:
+            sys.stderr.write("Blogit: Error happend while filtering with:")
+            sys.stderr.write(filter)
+            return text
 
     def command_commit(self):
         if self.current_post is None:

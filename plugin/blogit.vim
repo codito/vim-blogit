@@ -47,15 +47,28 @@
 "       let blogit_password='Your blog password. Not the API-key.'
 "       let blogit_url='http://your.path.to/xmlrpc.php'
 "
-"   In addition you can set these optional settings in your vimrc:
+"   In addition you can set these settings in your vimrc:
 "
-"       let have_tags=1
 "       let blogit_unformat='pandoc -f html -t rst --reference-links'
 "       let blogit_format='pandoc -f rst -t html'
+"
+"   The blogit_format and blogit_unformat each contain a shell command to 
+"   filter the blog entry text (no meta data) before a commit and after an 
+"   edit, repectivly. In the example we use pandoc[1] to edit the blog in
+"   reStructuredText[2].
+"
+"       let have_tags=0
+"
+"   This deactivates the use of tags. It is needed if your Wordpress doesn't
+"   have the UTW-RPC[3] plugin installed.
 "
 " Usage :
 "   Just fill in the blanks, do not modify the highlighted parts and everything
 "   should be ok.
+"
+" [1] http://johnmacfarlane.net/pandoc/
+" [2] http://docutils.sourceforge.net/docs/ref/rst/introduction.html
+" [3] http://blog.circlesixdesign.com/download/utw-rpc-autotag/
 "
 " vim: set et softtabstop=4 cinoptions=4 shiftwidth=4 ts=4 ai
 
@@ -114,7 +127,7 @@ class BlogIt:
             allposts = self.client.metaWeblog.getRecentPosts('',
                     self.blog_username(), self.blog_password())
             if not allposts:
-                sys.stderr.write("There isn't any post.")
+                sys.stderr.write("There are no posts.")
                 return
 
             formatter = '%%%dd\t%%s\t%%s' % len(allposts[0]['postid'])

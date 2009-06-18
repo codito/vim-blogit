@@ -158,7 +158,7 @@ class BlogIt:
         try:
             row,col = vim.current.window.cursor
             id = vim.current.buffer[row-1].split()[0]
-            vim.command('close')
+            vim.command('bdelete')
             self.command_edit(int(id))
         except Exception:
             return
@@ -344,6 +344,9 @@ class BlogIt:
             sys.stderr.write("'id' must be an integer value.")
             return
 
+        if self.current_post and int(self.current_post['postid']) == int(id):
+            vim.command('bdelete')
+            self.current_post = None
         try:
             self.client.metaWeblog.deletePost('', id, self.blog_username,
                                               self.blog_password)
@@ -351,9 +354,6 @@ class BlogIt:
             sys.stderr.write(e.faultString)
             return
         sys.stdout.write('Article removed')
-        if self.current_post and int(self.current_post['postid']) == int(id):
-            del vim.current.buffer[:]
-            self.current_post = None
 
     def command_categories(self):
         cats = self.client.wp.getCategories('', self.blog_username,

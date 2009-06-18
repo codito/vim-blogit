@@ -90,10 +90,21 @@ class BlogIt:
 
     def __init__(self):
         self.client = None
-        self.current_post = None
+        self.post = {}
 
     def connect(self):
         self.client = xmlrpclib.ServerProxy(self.blog_url)
+
+    def get_current_post(self):
+        try:
+            return self.post[vim.current.buffer.number]
+        except KeyError:
+            return None
+
+    def set_current_post(self, value):
+        self.post[vim.current.buffer.number] = value
+
+    current_post = property(get_current_post, set_current_post)
 
     def command(self, command='help', *args):
         if self.client is None:

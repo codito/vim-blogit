@@ -49,7 +49,7 @@
 "
 "   In addition you can set these settings in your vimrc:
 "
-"       let have_tags=0
+"       let blogit_tags=0
 "
 "   This deactivates the use of tags. It is needed if your WordPress doesn't
 "   have the UTW-RPC[3] plugin installed (WordPress.com does).
@@ -376,7 +376,7 @@ class BlogIt:
 
     @property
     def have_tags(self):
-        return vim.eval("!exists('have_tags') || have_tags")
+        return vim.eval("!exists('blogit_tags') || blogit_tags")
 
 
 blogit = BlogIt()

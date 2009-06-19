@@ -73,6 +73,9 @@
 "   Just fill in the blanks, do not modify the highlighted parts and everything
 "   should be ok.
 "
+"   gf or <enter> in the ':Blogit ls' buffer edits the blog post in the
+"   current line.
+"
 " [1] http://johnmacfarlane.net/pandoc/
 " [2] http://docutils.sourceforge.net/docs/ref/rst/introduction.html
 " [3] http://blog.circlesixdesign.com/download/utw-rpc-autotag/
@@ -160,7 +163,7 @@ class BlogIt:
                         self.DateTime_to_str(p['date_created_gmt'], '%x'), 
                         p['title'].encode('utf-8')))
             vim.command('setlocal buftype=nofile bufhidden=wipe nobuflisted ' +
-                    'noswapfile syntax=blogsyntax nomodifiable')
+                    'noswapfile syntax=blogsyntax nomodifiable nowrap')
             vim.current.window.cursor = (2, 0)
             vim.command('nnoremap <buffer> <enter> :py blogit.list_edit()<cr>')
             vim.command('nnoremap <buffer> gf :py blogit.list_edit()<cr>')

@@ -405,11 +405,11 @@ class BlogIt:
     @property
     def have_tags(self):
         return vim.eval("!exists('%(name)s_tags') || %(name)s_tags" % \
-                { 'name': self.blog_name })
+                { 'name': self.blog_name } ) != '0'
 
     @property
     def blog_name(self):
-        if vim.eval("exists('blog_name')"):
+        if vim.eval("exists('blog_name')") != '0':
             return vim.eval('blog_name')
         else:
             return 'blogit'

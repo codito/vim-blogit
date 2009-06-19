@@ -62,6 +62,13 @@
 "   edit, respectively. In the example we use pandoc[1] to edit the blog in
 "   reStructuredText[2].
 "
+"   If you have multible blogs replace 'blogit' in 'blogit_username' etc. by a
+"   name of your choice (e.g. 'your_blog_name') and use:
+"
+"       let blog_name='your_blog_name'
+"
+"   to switch between them.
+"
 " Usage :
 "   Just fill in the blanks, do not modify the highlighted parts and everything
 "   should be ok.
@@ -382,19 +389,27 @@ class BlogIt:
 
     @property
     def blog_username(self):
-        return vim.eval('blogit_username')
+        return vim.eval(self.blog_name + '_username')
 
     @property
     def blog_password(self):
-        return vim.eval('blogit_password')
+        return vim.eval(self.blog_name + '_password')
 
     @property
     def blog_url(self):
-        return vim.eval('blogit_url')
+        return vim.eval(self.blog_name + '_url')
 
     @property
     def have_tags(self):
-        return vim.eval("!exists('blogit_tags') || blogit_tags")
+        return vim.eval("!exists('%(name)s_tags') || %(name)s_tags" % \
+                { 'name': self.blog_name })
+
+    @property
+    def blog_name(self):
+        if vim.eval("exists('blog_name')"):
+            return vim.eval('blog_name')
+        else:
+            return 'blogit'
 
 
 blogit = BlogIt()

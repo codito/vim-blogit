@@ -77,7 +77,9 @@ command! -nargs=* Blogit exec('py blogit.command(<f-args>)')
 
 python <<EOF
 # -*- coding: utf-8 -*-
-import vim, xmlrpclib, sys, re, time, datetime
+import vim, xmlrpclib, sys, re
+from time import mktime, strptime, strftime, localtime, gmtime
+from calendar import timegm
 from subprocess import Popen, CalledProcessError, PIPE
 from xmlrpclib import DateTime, Fault
 from types import MethodType
@@ -139,13 +141,17 @@ class BlogIt:
             if not allposts:
                 sys.stderr.write("There are no posts.")
                 return
-
-            formatter = '%%%dd\t%%s\t%%s' % len(allposts[0]['postid'])
             vim.command('botright new')
             self.current_post = None
-            vim.current.buffer[0] = "ID\tDate             \tTitle"
+            vim.current.buffer[0] = "%sID    Date%sTitle" % \
+                    ( ' ' * ( len(allposts[0]['postid']) - 2 ),
+                    ( ' ' * len(self.DateTime_to_str(
+                    allposts[0]['date_created_gmt'], '%x')) ) )
+            format = '%%%dd    %%s    %%s' % max(2, len(allposts[0]['postid']))
             for p in allposts:
-                vim.current.buffer.append(formatter % (int(p['postid']), p['date_created_gmt'], p['title'].encode('utf-8')))
+                vim.current.buffer.append(format % (int(p['postid']), 
+                        self.DateTime_to_str(p['date_created_gmt'], '%x'), 
+                        p['title'].encode('utf-8')))
             vim.command('setlocal buftype=nofile bufhidden=wipe nobuflisted ' +
                     'noswapfile syntax=blogsyntax nomodifiable')
             vim.current.window.cursor = (2, 0)
@@ -199,7 +205,8 @@ class BlogIt:
         vim.current.buffer.append('Categories: %s' % ",".join(post["categories"]).encode("utf-8"))
         if self.have_tags:
             vim.current.buffer.append('Tags: %s' % post["mt_keywords"].encode("utf-8"))
-        vim.current.buffer.append('Date: %s' % post['date_created_gmt'])
+        vim.current.buffer.append('Date: %s' % self.DateTime_to_str(
+                post['date_created_gmt']))
         vim.current.buffer.append('')
         content = self.unformat(post["description"].encode("utf-8"))
         for line in content.split('\n'):
@@ -217,6 +224,20 @@ class BlogIt:
         vim.command('set nomodified')
         vim.command('set textwidth=0')
         self.current_post = post
+
+    def str_to_DateTime(self, text=''):
+        if text == '':
+            text = localtime()
+        else:
+            text = strptime(text, '%c')
+        return DateTime(strftime('%Y%m%dT%H:%M:%S', gmtime(mktime(text))))
+
+    def DateTime_to_str(self, date, format='%c'):
+        try:
+            return strftime(format, localtime(timegm(strptime(str(date),
+                                              '%Y%m%dT%H:%M:%S'))))
+        except ValueError:
+            return ''
 
     def getPost(self, id):
         return self.client.metaWeblog.getPost(id, self.blog_username,
@@ -289,9 +310,6 @@ class BlogIt:
             return
         self.sendArticle(push=0)
 
-    def nowstr(self):
-        return time.strftime('%Y%m%dT%H:%M:%S', time.localtime(time.mktime(datetime.datetime.utcnow().timetuple())))
-
     def sendArticle(self, push=0):
         try:
             vim.command('set nomodified')
@@ -313,12 +331,12 @@ class BlogIt:
             if len(textl) > 1:
                 post['mt_text_more'] = textl[1]
 
-            datetime = self.getMeta('Date')
-            if datetime != '' and (self.current_post['post_status'] != 'draft' or \
-                                   DateTime(datetime) > DateTime(self.nowstr())):
-                post['date_created_gmt'] = DateTime(datetime)
+            lasttime = self.str_to_DateTime(self.getMeta('Date'))
+            nowtime = self.str_to_DateTime()
+            if lasttime is None or self.current_post['post_status'] == 'draft':
+                post['date_created_gmt'] = nowtime
             else:
-                post['date_created_gmt'] = DateTime(self.nowstr())
+                post['date_created_gmt'] = max(lasttime, nowtime)
 
             if push:
                 post['post_status'] = 'publish'

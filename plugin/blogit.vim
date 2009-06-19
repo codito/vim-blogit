@@ -33,7 +33,7 @@
 "   Unpublish article
 " ":Blogit rm <id>"
 "   Remove an article
-" ":Blogit categories"
+" ":Blogit categories" or ":Blogit cat"
 "   Show categories list
 " ":Blogit help"
 "   Display help
@@ -76,6 +76,10 @@
 "   gf or <enter> in the ':Blogit ls' buffer edits the blog post in the
 "   current line.
 "
+"   Categories can be omni completed via *compl-function* (usually
+"   CTRL-X_CTRL-U) once the list of categories is gotten via 
+"   ":Blogit cat[egories]".
+"
 " [1] http://johnmacfarlane.net/pandoc/
 " [2] http://docutils.sourceforge.net/docs/ref/rst/introduction.html
 " [3] http://blog.circlesixdesign.com/download/utw-rpc-autotag/
@@ -84,6 +88,32 @@
 
 runtime! passwords.vim
 command! -nargs=* Blogit exec('py blogit.command(<f-args>)')
+
+let s:used_categories = []
+
+function CompleteCategories(findstart, base)
+    " based on code from :he complete-functions
+    if a:findstart
+        " locate the start of the word
+        let line = getline('.')
+        let start = col('.') - 1
+        while start > 0 && line[start - 1] =~ '\a'
+            let start -= 1
+        endwhile
+        return start
+    else
+        if getline('.') !~? '^Categories: '
+            return []
+        endif
+	    let res = []
+	    for m in s:used_categories
+	        if m =~ '^' . a:base
+		        call add(res, m . ', ')
+	        endif
+	    endfor
+	    return res
+    endif
+endfunction
 
 python <<EOF
 # -*- coding: utf-8 -*-
@@ -142,6 +172,7 @@ class BlogIt:
         sys.stdout.write("   Blogit unpush          unpublish post\n")
         sys.stdout.write("   Blogit rm <id>         remove a post\n")
         sys.stdout.write("   Blogit categories      list categories\n")
+        sys.stdout.write("   Blogit cat             same as above\n")
         sys.stdout.write("   Blogit help            display this notice\n")
 
     def command_ls(self):
@@ -208,11 +239,11 @@ class BlogIt:
 
     def display_post(self, post):
         vim.command('enew')
-        vim.command("set ft=mail")
+        vim.command("setlocal ft=mail completefunc=CompleteCategories")
         vim.current.buffer[0] = 'From: %s' % post['wp_author_display_name'].encode('utf-8')
         vim.current.buffer.append('Post-Id: %s' % post['postid'])
         vim.current.buffer.append('Subject: %s' % post['title'].encode('utf-8'))
-        vim.current.buffer.append('Categories: %s' % ",".join(post["categories"]).encode("utf-8"))
+        vim.current.buffer.append('Categories: %s' % ", ".join(post["categories"]).encode("utf-8"))
         if self.have_tags:
             vim.current.buffer.append('Tags: %s' % post["mt_keywords"].encode("utf-8"))
         vim.current.buffer.append('Date: %s' % self.DateTime_to_str(
@@ -332,7 +363,7 @@ class BlogIt:
             post = self.current_post
             post['title'] = self.getMeta('Subject')
             post['wp_author_display_name'] = self.getMeta('From')
-            post['categories'] = self.getMeta('Categories').split(',')
+            post['categories'] = self.getMeta('Categories').split(', ')
             if self.have_tags:
                 post['mt_keywords'] = self.getMeta('Tags')
 
@@ -384,11 +415,21 @@ class BlogIt:
         sys.stdout.write('Article removed')
 
     def command_categories(self):
-        cats = self.client.wp.getCategories('', self.blog_username,
-                                            self.blog_password)
-        sys.stdout.write('Categories:\n')
-        for cat in cats:
-            sys.stdout.write('  %s\n' % cat['categoryName'])
+        sys.stdout.write('Categories:\n  ' + '\n  '.join(self.getCategories()) 
+                         + '\n')
+
+    command_cat = command_categories
+
+    def getCategories(self):
+        """ Returns a list of used categories from the server (slow).
+
+        Side effect: Sets vim variable s:used_categories for omni-completion.
+        """
+        categories = [ cat['categoryName']
+                for cat in self.client.wp.getCategories('', 
+                    self.blog_username, self.blog_password) ]
+        vim.command('let s:used_categories = %s' % categories)
+        return categories
 
     @property
     def blog_username(self):

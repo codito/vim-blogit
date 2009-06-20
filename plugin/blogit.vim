@@ -139,6 +139,12 @@ from types import MethodType
 #####################
 
 class BlogIt:
+    class FilterException(Exception):
+        def __init__(self, message, input_text, filter):
+            self.message = "Blogit: Error happend while filtering with:" + \
+                    filter + '\n' + message 
+            self.input_text = input_text
+            self.filter = filter
 
     def __init__(self):
         self.client = None
@@ -260,7 +266,11 @@ class BlogIt:
         vim.current.buffer.append('Date: %s' % self.DateTime_to_str(
                 post['date_created_gmt']))
         vim.current.buffer.append('')
-        content = self.unformat(post["description"].encode("utf-8"))
+        try:
+            content = self.unformat(post["description"].encode("utf-8"))
+        except self.FilterException, e:
+            content = e.input_text
+            sys.stderr.write(e.message)
         for line in content.split('\n'):
             vim.current.buffer.append(line)
 
@@ -268,7 +278,11 @@ class BlogIt:
             vim.current.buffer.append('')
             vim.current.buffer.append('<!--more-->')
             vim.current.buffer.append('')
-            content = self.unformat(post["mt_text_more"].encode("utf-8"))
+            try:
+                content = self.unformat(post["mt_text_more"].encode("utf-8"))
+            except self.FilterException, e:
+                content = e.input_text
+                sys.stderr.write(e.message)
             for line in content.split('\n'):
                 vim.current.buffer.append(line)
 
@@ -319,6 +333,10 @@ class BlogIt:
         return 0
 
     def getText(self, start_text):
+        """ 
+        
+        Can raise FilterException. 
+        """
         text = '\n'.join(vim.current.buffer[start_text:])
         return map(self.format, text.split('\n<!--more-->\n\n'))
 
@@ -331,14 +349,16 @@ class BlogIt:
             return text
         try:
             filter = vim.eval(vim_var)
-            p = Popen(filter, shell=True, stdin=PIPE, stdout=PIPE)
+            p = Popen(filter, shell=True, stdin=PIPE, stdout=PIPE, stderr=PIPE)
             p.stdin.write(text)
             p.stdin.close()
+            if p.wait():
+                raise self.FilterException(p.stderr.read(), text, filter)
             return p.stdout.read()
-        except:
-            sys.stderr.write("Blogit: Error happend while filtering with:")
-            sys.stderr.write(filter)
-            return text
+        except self.FilterException:
+            raise
+        except Exception, e:
+            raise self.FilterException(e.message, text, filter)
 
     def command_commit(self):
         if self.current_post is None:
@@ -404,6 +424,8 @@ class BlogIt:
                 self.client.metaWeblog.editPost(strid, self.blog_username,
                                                 self.blog_password, post, push)
             self.display_post(self.getPost(strid))
+        except self.FilterException, e:
+            sys.stderr.write(e.message)
         except Fault, e:
             sys.stderr.write(e.faultString)
 

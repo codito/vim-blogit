@@ -14,9 +14,10 @@
 " Foundation, Inc., 59 Temple Place - Suite 330, Boston, MA 02111-1307, USA.
 "
 " Maintainer:   Romain Bignon
+" Contributor:  Adam Schmalhofer
 " URL:          http://symlink.me/wiki/blogit
 " Version:      1.0.1
-" Last Change:  2009 April 11
+" Last Change:  2009 June 20
 "
 " Commands :
 " ":Blogit ls"
@@ -59,8 +60,8 @@
 "       let blogit_unformat='pandoc --from=html --to=rst --reference-links'
 "       let blogit_format='pandoc --from=rst --to=html'
 "
-"   The blogit_format and blogit_unformat each contain a shell command to 
-"   filter the blog entry text (no meta data) before a commit and after an 
+"   The blogit_format and blogit_unformat each contain a shell command to
+"   filter the blog entry text (no meta data) before a commit and after an
 "   edit, respectively. In the example we use pandoc[1] to edit the blog in
 "   reStructuredText[2].
 "
@@ -81,7 +82,7 @@
 "   current line.
 "
 "   Categories and tags can be omni completed via *compl-function* (usually
-"   CTRL-X_CTRL-U) once the list of them is gotten via ":Blogit cat[egories]" 
+"   CTRL-X_CTRL-U) once the list of them is gotten via ":Blogit cat[egories]"
 "   and ":Blogit tags".
 "
 " [1] http://johnmacfarlane.net/pandoc/
@@ -200,8 +201,8 @@ class BlogIt:
                     allposts[0]['date_created_gmt'], '%x')) ) )
             format = '%%%dd    %%s    %%s' % max(2, len(allposts[0]['postid']))
             for p in allposts:
-                vim.current.buffer.append(format % (int(p['postid']), 
-                        self.DateTime_to_str(p['date_created_gmt'], '%x'), 
+                vim.current.buffer.append(format % (int(p['postid']),
+                        self.DateTime_to_str(p['date_created_gmt'], '%x'),
                         p['title'].encode('utf-8')))
             vim.command('setlocal buftype=nofile bufhidden=wipe nobuflisted ' +
                     'noswapfile syntax=blogsyntax nomodifiable nowrap')
@@ -425,13 +426,13 @@ class BlogIt:
         sys.stdout.write('Article removed')
 
     def command_categories(self):
-        sys.stdout.write('Categories:\n  ' + '\n  '.join(self.getCategories()) 
+        sys.stdout.write('Categories:\n  ' + '\n  '.join(self.getCategories())
                          + '\n')
 
     command_cat = command_categories
 
     def command_tags(self):
-        tags = [ tag['name'] for tag in self.client.wp.getTags('', 
+        tags = [ tag['name'] for tag in self.client.wp.getTags('',
                     self.blog_username, self.blog_password) ]
         vim.command('let s:used_tags = %s' % tags)
         sys.stdout.write('Tags:\n' + ', '.join(tags))
@@ -442,7 +443,7 @@ class BlogIt:
         Side effect: Sets vim variable s:used_categories for omni-completion.
         """
         categories = [ cat['categoryName']
-                for cat in self.client.wp.getCategories('', 
+                for cat in self.client.wp.getCategories('',
                     self.blog_username, self.blog_password) ]
         vim.command('let s:used_categories = %s' % categories)
         return categories

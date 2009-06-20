@@ -35,6 +35,8 @@
 "   Remove an article
 " ":Blogit categories" or ":Blogit cat"
 "   Show categories list
+" ":Blogit tags"
+"   Show tag list
 " ":Blogit help"
 "   Display help
 "
@@ -76,9 +78,9 @@
 "   gf or <enter> in the ':Blogit ls' buffer edits the blog post in the
 "   current line.
 "
-"   Categories can be omni completed via *compl-function* (usually
-"   CTRL-X_CTRL-U) once the list of categories is gotten via 
-"   ":Blogit cat[egories]".
+"   Categories and tags can be omni completed via *compl-function* (usually
+"   CTRL-X_CTRL-U) once the list of them is gotten via ":Blogit cat[egories]" 
+"   and ":Blogit tags".
 "
 " [1] http://johnmacfarlane.net/pandoc/
 " [2] http://docutils.sourceforge.net/docs/ref/rst/introduction.html
@@ -90,6 +92,7 @@ runtime! passwords.vim
 command! -nargs=* Blogit exec('py blogit.command(<f-args>)')
 
 let s:used_categories = []
+let s:used_tags = []
 
 function CompleteCategories(findstart, base)
     " based on code from :he complete-functions
@@ -102,11 +105,15 @@ function CompleteCategories(findstart, base)
         endwhile
         return start
     else
-        if getline('.') !~? '^Categories: '
+        if getline('.') =~? '^Categories: '
+            let L = s:used_categories
+        elseif getline('.') =~? '^Tags: '
+            let L = s:used_tags
+        else
             return []
         endif
 	    let res = []
-	    for m in s:used_categories
+	    for m in L
 	        if m =~ '^' . a:base
 		        call add(res, m . ', ')
 	        endif
@@ -173,6 +180,7 @@ class BlogIt:
         sys.stdout.write("   Blogit rm <id>         remove a post\n")
         sys.stdout.write("   Blogit categories      list categories\n")
         sys.stdout.write("   Blogit cat             same as above\n")
+        sys.stdout.write("   Blogit tag             list tags\n")
         sys.stdout.write("   Blogit help            display this notice\n")
 
     def command_ls(self):
@@ -419,6 +427,12 @@ class BlogIt:
                          + '\n')
 
     command_cat = command_categories
+
+    def command_tags(self):
+        tags = [ tag['name'] for tag in self.client.wp.getTags('', 
+                    self.blog_username, self.blog_password) ]
+        vim.command('let s:used_tags = %s' % tags)
+        sys.stdout.write('Tags:\n' + ', '.join(tags))
 
     def getCategories(self):
         """ Returns a list of used categories from the server (slow).

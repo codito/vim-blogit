@@ -326,7 +326,7 @@ class BlogIt:
 
     def format(self, text, vim_var='blogit_format'):
         """ Filter text with command in vim_var."""
-        if not vim.eval('exists("%s")' % vim_var):
+        if not vim.eval('exists("%s")' % vim_var) != '0':
             return text
         try:
             filter = vim.eval(vim_var)

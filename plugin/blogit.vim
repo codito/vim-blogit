@@ -68,6 +68,8 @@
 "   name of your choice (e.g. 'your_blog_name') and use:
 "
 "       let blog_name='your_blog_name'
+"   or
+"       let b:blog_name='your_blog_name'
 "
 "   to switch between them.
 "
@@ -464,7 +466,9 @@ class BlogIt:
 
     @property
     def blog_name(self):
-        if vim.eval("exists('blog_name')") != '0':
+        if vim.eval("exists('b:blog_name')") != '0':
+            return vim.eval('b:blog_name')
+        elif vim.eval("exists('blog_name')") != '0':
             return vim.eval('blog_name')
         else:
             return 'blogit'

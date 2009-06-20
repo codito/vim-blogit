@@ -359,28 +359,18 @@ class BlogIt:
             raise self.FilterException(e.message, text, filter)
 
     def command_commit(self):
-        if self.current_post is None:
-            sys.stderr.write("Not editing any post.")
-            return
-
-        push = 0
-        if self.current_post['post_status'] == 'publish':
-            push = 1
-        self.sendArticle(push=push)
+        self.sendArticle()
 
     def command_push(self):
-        if self.current_post is None:
-            sys.stderr.write("Not editing any post.")
-            return
         self.sendArticle(push=1)
 
     def command_unpush(self):
-        if self.current_post is None:
-            sys.stderr.write("Not editing any post.")
-            return
         self.sendArticle(push=0)
 
-    def sendArticle(self, push=0):
+    def sendArticle(self, push=None):
+        if self.current_post is None:
+            sys.stderr.write("Not editing a post.")
+            return
         try:
             vim.command('set nomodified')
             start_text = 0
@@ -389,7 +379,8 @@ class BlogIt:
                 if line == '':
                     break
 
-            post = self.current_post
+            post = self.current_post.copy()
+
             post['title'] = self.getMeta('Subject')
             post['wp_author_display_name'] = self.getMeta('From')
             post['categories'] = self.getMeta('Categories').split(', ')
@@ -401,23 +392,25 @@ class BlogIt:
             if len(textl) > 1:
                 post['mt_text_more'] = textl[1]
 
-            lasttime = self.str_to_DateTime(self.getMeta('Date'))
-            nowtime = self.str_to_DateTime()
-            if lasttime is None or self.current_post['post_status'] == 'draft':
-                post['date_created_gmt'] = nowtime
+            if post is None and self.current_post['post_status'] == 'publish':
+                post['date_created_gmt'] = \
+                        self.str_to_DateTime(self.getMeta('Date'))
             else:
-                post['date_created_gmt'] = max(lasttime, nowtime)
+                post['date_created_gmt'] = self.str_to_DateTime()
 
-            if push:
+            if push == 1:
                 post['post_status'] = 'publish'
-            else:
+            elif push == 0:
                 post['post_status'] = 'draft'
+            else:
+                post['post_status'] = self.current_post['post_status']
+                push = 0
 
             strid = self.getMeta('Post-Id')
 
             if strid == '':
                 strid = self.client.metaWeblog.newPost('', self.blog_username,
-                                                       self.blog_password, post, push)
+                                                self.blog_password, post, push)
             else:
                 self.client.metaWeblog.editPost(strid, self.blog_username,
                                                 self.blog_password, post, push)

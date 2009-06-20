@@ -236,13 +236,16 @@ class BlogIt:
 
         try:
             post = self.getPost(id)
-            self.display_post(post)
         except Fault, e:
             sys.stderr.write('Blogit Fault: ' + e.faultString)
+        else:
+            vim.command('enew')
+            self.display_post(post)
 
     def command_new(self):
         username = self.client.blogger.getUserInfo(
                 '', self.blog_username, self.blog_password)['firstname']
+        vim.command('enew')
         self.display_post({'wp_author_display_name': username,
                            'postid': '',
                            'title': '',
@@ -255,14 +258,17 @@ class BlogIt:
                          })
 
     def display_post(self, post):
-        vim.command('enew')
+        vim.current.buffer[:] = None
         vim.command("setlocal ft=mail completefunc=CompleteCategories")
-        vim.current.buffer[0] = 'From: %s' % post['wp_author_display_name'].encode('utf-8')
+        vim.current.buffer[0] = 'From: %s' % \
+                post['wp_author_display_name'].encode('utf-8')
         vim.current.buffer.append('Post-Id: %s' % post['postid'])
         vim.current.buffer.append('Subject: %s' % post['title'].encode('utf-8'))
-        vim.current.buffer.append('Categories: %s' % ", ".join(post["categories"]).encode("utf-8"))
+        vim.current.buffer.append('Categories: %s' % \
+                ", ".join(post["categories"]).encode("utf-8"))
         if self.have_tags:
-            vim.current.buffer.append('Tags: %s' % post["mt_keywords"].encode("utf-8"))
+            vim.current.buffer.append('Tags: %s' % \
+                    post["mt_keywords"].encode("utf-8"))
         vim.current.buffer.append('Date: %s' % self.DateTime_to_str(
                 post['date_created_gmt']))
         vim.current.buffer.append('')

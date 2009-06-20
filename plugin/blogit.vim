@@ -399,7 +399,7 @@ class BlogIt:
             if len(textl) > 1:
                 post['mt_text_more'] = textl[1]
 
-            if post is None and self.current_post['post_status'] == 'publish':
+            if push is None and self.current_post['post_status'] == 'publish':
                 post['date_created_gmt'] = \
                         self.str_to_DateTime(self.getMeta('Date'))
             else:

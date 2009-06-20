@@ -266,11 +266,7 @@ class BlogIt:
         vim.current.buffer.append('Date: %s' % self.DateTime_to_str(
                 post['date_created_gmt']))
         vim.current.buffer.append('')
-        try:
-            content = self.unformat(post["description"].encode("utf-8"))
-        except self.FilterException, e:
-            content = e.input_text
-            sys.stderr.write(e.message)
+        content = self.unformat(post["description"].encode("utf-8"))
         for line in content.split('\n'):
             vim.current.buffer.append(line)
 
@@ -278,11 +274,7 @@ class BlogIt:
             vim.current.buffer.append('')
             vim.current.buffer.append('<!--more-->')
             vim.current.buffer.append('')
-            try:
-                content = self.unformat(post["mt_text_more"].encode("utf-8"))
-            except self.FilterException, e:
-                content = e.input_text
-                sys.stderr.write(e.message)
+            content = self.unformat(post["mt_text_more"].encode("utf-8"))
             for line in content.split('\n'):
                 vim.current.buffer.append(line)
 
@@ -341,10 +333,17 @@ class BlogIt:
         return map(self.format, text.split('\n<!--more-->\n\n'))
 
     def unformat(self, text):
-        return self.format(text, 'blogit_unformat')
+        try:
+            return self.format(text, 'blogit_unformat')
+        except self.FilterException, e:
+            sys.stderr.write(e.message)
+            return e.input_text
 
     def format(self, text, vim_var='blogit_format'):
-        """ Filter text with command in vim_var."""
+        """ Filter text with command in vim_var.
+        
+        Can raise FilterException.
+        """
         if not vim.eval('exists("%s")' % vim_var) != '0':
             return text
         try:

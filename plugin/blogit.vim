@@ -16,8 +16,8 @@
 " Maintainer:   Romain Bignon
 " Contributor:  Adam Schmalhofer
 " URL:          http://symlink.me/wiki/blogit
-" Version:      1.0.1
-" Last Change:  2009 June 20
+" Version:      1.1
+" Last Change:  2009 June 21
 "
 " Commands :
 " ":Blogit ls"
@@ -37,7 +37,7 @@
 " ":Blogit categories" or ":Blogit cat"
 "   Show categories list
 " ":Blogit tags"
-"   Show tag list
+"   Show tags list
 " ":Blogit help"
 "   Display help
 "
@@ -58,7 +58,7 @@
 "   have the UTW-RPC[3] plugin installed (WordPress.com does).
 "
 "       let blogit_unformat='pandoc --from=html --to=rst --reference-links'
-"       let blogit_format='pandoc --from=rst --to=html'
+"       let blogit_format='pandoc --from=rst --to=html --no-wrap'
 "
 "   The blogit_format and blogit_unformat each contain a shell command to
 "   filter the blog entry text (no meta data) before a commit and after an
@@ -142,7 +142,7 @@ class BlogIt:
     class FilterException(Exception):
         def __init__(self, message, input_text, filter):
             self.message = "Blogit: Error happend while filtering with:" + \
-                    filter + '\n' + message 
+                    filter + '\n' + message
             self.input_text = input_text
             self.filter = filter
 
@@ -187,9 +187,8 @@ class BlogIt:
         sys.stdout.write("   Blogit push            publish post\n")
         sys.stdout.write("   Blogit unpush          unpublish post\n")
         sys.stdout.write("   Blogit rm <id>         remove a post\n")
-        sys.stdout.write("   Blogit categories      list categories\n")
-        sys.stdout.write("   Blogit cat             same as above\n")
-        sys.stdout.write("   Blogit tag             list tags\n")
+        sys.stdout.write("   Blogit cat[egories]    list categories\n")
+        sys.stdout.write("   Blogit tags            list tags\n")
         sys.stdout.write("   Blogit help            display this notice\n")
 
     def command_ls(self):
@@ -331,9 +330,9 @@ class BlogIt:
         return 0
 
     def getText(self, start_text):
-        """ 
-        
-        Can raise FilterException. 
+        """
+
+        Can raise FilterException.
         """
         text = '\n'.join(vim.current.buffer[start_text:])
         return map(self.format, text.split('\n<!--more-->\n\n'))
@@ -347,7 +346,7 @@ class BlogIt:
 
     def format(self, text, vim_var='blogit_format'):
         """ Filter text with command in vim_var.
-        
+
         Can raise FilterException.
         """
         if not vim.eval('exists("%s")' % vim_var) != '0':

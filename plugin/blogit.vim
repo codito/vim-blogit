@@ -52,11 +52,6 @@
 "
 "   In addition you can set these settings in your vimrc:
 "
-"       let blogit_tags=0
-"
-"   This deactivates the use of tags. It is needed if your WordPress doesn't
-"   have the UTW-RPC[3] plugin installed (WordPress.com does).
-"
 "       let blogit_unformat='pandoc --from=html --to=rst --reference-links'
 "       let blogit_format='pandoc --from=rst --to=html --no-wrap'
 "
@@ -84,6 +79,9 @@
 "   Categories and tags can be omni completed via *compl-function* (usually
 "   CTRL-X_CTRL-U) once the list of them is gotten via ":Blogit cat[egories]"
 "   and ":Blogit tags".
+"
+"   To use tags your WordPress needs to have the UTW-RPC[3] plugin installed 
+"   (WordPress.com does).
 "
 " [1] http://johnmacfarlane.net/pandoc/
 " [2] http://docutils.sourceforge.net/docs/ref/rst/introduction.html
@@ -245,37 +243,38 @@ class BlogIt:
         username = self.client.blogger.getUserInfo(
                 '', self.blog_username, self.blog_password)['firstname']
         vim.command('enew')
-        self.display_post({'wp_author_display_name': username,
-                           'postid': '',
-                           'title': '',
-                           'categories': '',
-                           'mt_keywords': '',
-                           'date_created_gmt': '',
-                           'description': '',
-                           'mt_text_more': '',
+        self.display_post({ meta_data_dict['From']: username,
                            'post_status': 'draft',
                          })
 
+    meta_data_dict = { 'From': 'wp_author_display_name', 'Post-Id': 'postid', 
+            'Subject': 'title', 'Categories': 'categories', 
+            'Tags': 'mt_keywords', 'Date': 'date_created_gmt' 
+           }
+
     def display_post(self, post):
+        meta_data_f_dict = { 'Date': self.DateTime_to_str, 
+                   'Categories': lambda L: ', '.join(L)
+                 }
         vim.current.buffer[:] = None
         vim.command("setlocal ft=mail completefunc=CompleteCategories")
-        vim.current.buffer[0] = 'From: %s' % \
-                post['wp_author_display_name'].encode('utf-8')
-        vim.current.buffer.append('Post-Id: %s' % post['postid'])
-        vim.current.buffer.append('Subject: %s' % post['title'].encode('utf-8'))
-        vim.current.buffer.append('Categories: %s' % \
-                ", ".join(post["categories"]).encode("utf-8"))
-        if self.have_tags:
-            vim.current.buffer.append('Tags: %s' % \
-                    post["mt_keywords"].encode("utf-8"))
-        vim.current.buffer.append('Date: %s' % self.DateTime_to_str(
-                post['date_created_gmt']))
+        for label in [ 'From', 'Post-Id', 'Subject', 'Categories',
+                'Tags', 'Date' ]:
+            try:
+                val = post[self.meta_data_dict[label]]
+            except KeyError:
+                val = ''
+            if label in meta_data_f_dict:
+                val = meta_data_f_dict[label](val)
+            vim.current.buffer.append('%s: %s' % ( label, 
+                    str(val).encode('utf-8') ))
+        vim.current.buffer[0] = None
         vim.current.buffer.append('')
-        content = self.unformat(post["description"].encode("utf-8"))
+        content = self.unformat(post.get('description', '').encode("utf-8"))
         for line in content.split('\n'):
             vim.current.buffer.append(line)
 
-        if post['mt_text_more']:
+        if post.get('mt_text_more'):
             vim.current.buffer.append('')
             vim.current.buffer.append('<!--more-->')
             vim.current.buffer.append('')
@@ -306,28 +305,14 @@ class BlogIt:
         return self.client.metaWeblog.getPost(id, self.blog_username,
                                                   self.blog_password)
 
-    def getMeta(self, name):
-        n = self.getLine(name)
-        if not n:
-            return ''
-
-        r = re.compile('^%s: (.*)' % name)
-        m = r.match(vim.current.buffer[n])
-        if m:
-            return m.group(1)
-
-        return ''
-
-    def getLine(self, name):
-        r = re.compile('^%s: (.*)' % name)
-        for n, line in enumerate(vim.current.buffer):
-            if line == '':
-                return 0
+    def getMeta(self):
+        r = re.compile('^(.*?): (.*)$')
+        for line in vim.current.buffer:
+            if line.rstrip == '':
+                return
             m = r.match(line)
             if m:
-                return n
-
-        return 0
+                yield m.group(1, 2)
 
     def getText(self, start_text):
         """
@@ -374,6 +359,24 @@ class BlogIt:
         self.sendArticle(push=0)
 
     def sendArticle(self, push=None):
+
+        def sendPost(postid, post, push):
+            """ Unify newPost and editPost from the metaWeblog API. """
+            if postid == '':
+                postid = self.client.metaWeblog.newPost('', self.blog_username,
+                                                self.blog_password, post, push)
+            else:
+                self.client.metaWeblog.editPost(postid, self.blog_username,
+                                                self.blog_password, post, push)
+            return postid
+
+        def date_from_meta(str_date):
+            if push is None and self.current_post['post_status'] == 'publish':
+                return self.str_to_DateTime(str_date)
+            return self.str_to_DateTime()
+
+        def split_comma(x): return x.split(', ')
+
         if self.current_post is None:
             sys.stderr.write("Not editing a post.")
             return
@@ -386,41 +389,27 @@ class BlogIt:
                     break
 
             post = self.current_post.copy()
+            meta_data_f_dict = { 'Categories': split_comma, 
+                                 'Date': date_from_meta }
 
-            post['title'] = self.getMeta('Subject')
-            post['wp_author_display_name'] = self.getMeta('From')
-            post['categories'] = self.getMeta('Categories').split(', ')
-            if self.have_tags:
-                post['mt_keywords'] = self.getMeta('Tags')
+            for label, value in self.getMeta():
+                if label in meta_data_f_dict:
+                    value = meta_data_f_dict[label](value)
+                post[self.meta_data_dict[label]] = value
+
+            push_dict = { 0: 'draft', 1: 'publish', 
+                          None: self.current_post['post_status'] }
+            post['post_status'] = push_dict[push]
+            if push is None:
+                push = 0
 
             textl = self.getText(start_text)
             post['description'] = textl[0]
             if len(textl) > 1:
                 post['mt_text_more'] = textl[1]
 
-            if push is None and self.current_post['post_status'] == 'publish':
-                post['date_created_gmt'] = \
-                        self.str_to_DateTime(self.getMeta('Date'))
-            else:
-                post['date_created_gmt'] = self.str_to_DateTime()
-
-            if push == 1:
-                post['post_status'] = 'publish'
-            elif push == 0:
-                post['post_status'] = 'draft'
-            else:
-                post['post_status'] = self.current_post['post_status']
-                push = 0
-
-            strid = self.getMeta('Post-Id')
-
-            if strid == '':
-                strid = self.client.metaWeblog.newPost('', self.blog_username,
-                                                self.blog_password, post, push)
-            else:
-                self.client.metaWeblog.editPost(strid, self.blog_username,
-                                                self.blog_password, post, push)
-            self.display_post(self.getPost(strid))
+            postid = sendPost(post['postid'], post, push)
+            self.display_post(self.getPost(postid))
         except self.FilterException, e:
             sys.stderr.write(e.message)
         except Fault, e:
@@ -478,11 +467,6 @@ class BlogIt:
     @property
     def blog_url(self):
         return vim.eval(self.blog_name + '_url')
-
-    @property
-    def have_tags(self):
-        return vim.eval("!exists('%(name)s_tags') || %(name)s_tags" % \
-                { 'name': self.blog_name } ) != '0'
 
     @property
     def blog_name(self):

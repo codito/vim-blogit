@@ -37,7 +37,7 @@
 " ":Blogit categories" or ":Blogit cat"
 "   Show categories list
 " ":Blogit tags"
-"   Show tag list
+"   Show tags list
 " ":Blogit help"
 "   Display help
 "
@@ -187,9 +187,8 @@ class BlogIt:
         sys.stdout.write("   Blogit push            publish post\n")
         sys.stdout.write("   Blogit unpush          unpublish post\n")
         sys.stdout.write("   Blogit rm <id>         remove a post\n")
-        sys.stdout.write("   Blogit categories      list categories\n")
-        sys.stdout.write("   Blogit cat             same as above\n")
-        sys.stdout.write("   Blogit tag             list tags\n")
+        sys.stdout.write("   Blogit cat[egories]    list categories\n")
+        sys.stdout.write("   Blogit tags            list tags\n")
         sys.stdout.write("   Blogit help            display this notice\n")
 
     def command_ls(self):

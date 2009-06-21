@@ -58,7 +58,7 @@
 "   have the UTW-RPC[3] plugin installed (WordPress.com does).
 "
 "       let blogit_unformat='pandoc --from=html --to=rst --reference-links'
-"       let blogit_format='pandoc --from=rst --to=html'
+"       let blogit_format='pandoc --from=rst --to=html --no-wrap'
 "
 "   The blogit_format and blogit_unformat each contain a shell command to
 "   filter the blog entry text (no meta data) before a commit and after an
@@ -142,7 +142,7 @@ class BlogIt:
     class FilterException(Exception):
         def __init__(self, message, input_text, filter):
             self.message = "Blogit: Error happend while filtering with:" + \
-                    filter + '\n' + message 
+                    filter + '\n' + message
             self.input_text = input_text
             self.filter = filter
 
@@ -331,9 +331,9 @@ class BlogIt:
         return 0
 
     def getText(self, start_text):
-        """ 
-        
-        Can raise FilterException. 
+        """
+
+        Can raise FilterException.
         """
         text = '\n'.join(vim.current.buffer[start_text:])
         return map(self.format, text.split('\n<!--more-->\n\n'))
@@ -347,7 +347,7 @@ class BlogIt:
 
     def format(self, text, vim_var='blogit_format'):
         """ Filter text with command in vim_var.
-        
+
         Can raise FilterException.
         """
         if not vim.eval('exists("%s")' % vim_var) != '0':

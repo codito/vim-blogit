@@ -24,6 +24,8 @@
 "   Lists all articles in the blog
 " ":Blogit new"
 "   Opens page to write new article
+" ":Blogit this"
+"   Make current buffer a blog post
 " ":Blogit edit <id>"
 "   Opens the article <id> for edition
 " ":Blogit commit"
@@ -180,6 +182,7 @@ class BlogIt:
         sys.stdout.write("Available commands:\n")
         sys.stdout.write("   Blogit ls              list all posts\n")
         sys.stdout.write("   Blogit new             create a new post\n")
+        sys.stdout.write("   Blogit this            make this a blog post\n")
         sys.stdout.write("   Blogit edit <id>       edit a post\n")
         sys.stdout.write("   Blogit commit          commit current post\n")
         sys.stdout.write("   Blogit push            publish post\n")
@@ -240,19 +243,25 @@ class BlogIt:
             self.display_post(post)
 
     def command_new(self):
-        username = self.client.blogger.getUserInfo(
-                '', self.blog_username, self.blog_password)['firstname']
         vim.command('enew')
-        self.display_post({ meta_data_dict['From']: username,
-                           'post_status': 'draft',
-                         })
+        self.display_post()
+
+    def command_this(self):
+        if self.current_post is None:
+            self.display_post(new_text=vim.current.buffer[:])
+        else:
+            sys.stderr.write("Already editing a post.")
 
     meta_data_dict = { 'From': 'wp_author_display_name', 'Post-Id': 'postid', 
             'Subject': 'title', 'Categories': 'categories', 
             'Tags': 'mt_keywords', 'Date': 'date_created_gmt' 
            }
 
-    def display_post(self, post):
+    def display_post(self, post={}, new_text=None):
+        default_post = { 'post_status': 'draft',
+                         self.meta_data_dict['From']: self.blog_username }
+        default_post.update(post)
+        post = default_post
         meta_data_f_dict = { 'Date': self.DateTime_to_str, 
                    'Categories': lambda L: ', '.join(L)
                  }
@@ -270,8 +279,12 @@ class BlogIt:
                     str(val).encode('utf-8') ))
         vim.current.buffer[0] = None
         vim.current.buffer.append('')
-        content = self.unformat(post.get('description', '').encode("utf-8"))
-        for line in content.split('\n'):
+        if new_text is None:
+            content = self.unformat(post.get('description', '')\
+                        .encode("utf-8")).split('\n')
+        else:
+            content = new_text
+        for line in content:
             vim.current.buffer.append(line)
 
         if post.get('mt_text_more'):

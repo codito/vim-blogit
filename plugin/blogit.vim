@@ -179,20 +179,15 @@ class BlogIt:
                 sys.stderr.write('%s' % e)
 
     def command_help(self):
+        """ Blogit help   \t display this notice """
         sys.stdout.write("Available commands:\n")
-        sys.stdout.write("   Blogit ls              list all posts\n")
-        sys.stdout.write("   Blogit new             create a new post\n")
-        sys.stdout.write("   Blogit this            make this a blog post\n")
-        sys.stdout.write("   Blogit edit <id>       edit a post\n")
-        sys.stdout.write("   Blogit commit          commit current post\n")
-        sys.stdout.write("   Blogit push            publish post\n")
-        sys.stdout.write("   Blogit unpush          unpublish post\n")
-        sys.stdout.write("   Blogit rm <id>         remove a post\n")
-        sys.stdout.write("   Blogit cat[egories]    list categories\n")
-        sys.stdout.write("   Blogit tags            list tags\n")
-        sys.stdout.write("   Blogit help            display this notice\n")
+        for command in [ 'ls', 'new', 'this', 'edit', 'commit', 'push', 
+                    'unpush', 'rm', 'categories', 'tags', 'help' ]:
+            sys.stdout.write('   %s\n' % getattr(self, 'command_' + command).\
+                    __doc__.strip().expandtabs(12))
 
     def command_ls(self):
+        """ Blogit ls   \t list all posts """
         try:
             allposts = self.client.metaWeblog.getRecentPosts('',
                     self.blog_username, self.blog_password)
@@ -228,6 +223,7 @@ class BlogIt:
             return
 
     def command_edit(self, id):
+        """ Blogit edit <id>   \t edit a post """
         try:
             id = int(id)
         except ValueError:
@@ -243,10 +239,12 @@ class BlogIt:
             self.display_post(post)
 
     def command_new(self):
+        """ Blogit new   \t create a new post """
         vim.command('enew')
         self.display_post()
 
     def command_this(self):
+        """ Blogit this   \t make this a blog post """
         if self.current_post is None:
             self.display_post(new_text=vim.current.buffer[:])
         else:
@@ -363,12 +361,15 @@ class BlogIt:
             raise self.FilterException(e.message, text, filter)
 
     def command_commit(self):
+        """ Blogit commit   \t commit current post """
         self.sendArticle()
 
     def command_push(self):
+        """ Blogit push   \t publish post """
         self.sendArticle(push=1)
 
     def command_unpush(self):
+        """ Blogit unpush   \t unpublish post """
         self.sendArticle(push=0)
 
     def sendArticle(self, push=None):
@@ -429,6 +430,7 @@ class BlogIt:
             sys.stderr.write(e.faultString)
 
     def command_rm(self, id):
+        """ Blogit rm <id>   \t remove a post """
         try:
             id = int(id)
         except ValueError:
@@ -447,12 +449,14 @@ class BlogIt:
         sys.stdout.write('Article removed')
 
     def command_categories(self):
+        """ Blogit cat[egories]   \t list categories """
         sys.stdout.write('Categories:\n  ' + '\n  '.join(self.getCategories())
                          + '\n')
 
     command_cat = command_categories
 
     def command_tags(self):
+        """ Blogit tags   \t list tags """
         tags = [ tag['name'] for tag in self.client.wp.getTags('',
                     self.blog_username, self.blog_password) ]
         vim.command('let s:used_tags = %s' % tags)

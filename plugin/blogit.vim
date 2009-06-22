@@ -1,3 +1,4 @@
+"""
 " Copyright (C) 2009 Romain Bignon
 "
 " This program is free software; you can redistribute it and/or modify
@@ -125,7 +126,15 @@ endfunction
 
 python <<EOF
 # -*- coding: utf-8 -*-
-import vim, xmlrpclib, sys, re
+# Lets the python unit test ignore eveything above this line (docstring). """
+try:
+    import vim
+except ImportError:
+    # Used outside of vim (for testing)
+    from minimock import Mock
+    vim = Mock('vim')
+    import doctest
+import xmlrpclib, sys, re
 from time import mktime, strptime, strftime, localtime, gmtime
 from calendar import timegm
 from subprocess import Popen, CalledProcessError, PIPE
@@ -213,7 +222,7 @@ class BlogIt:
                 s = u''
             else:
                 s = u' (%s)' % ', '.join(comment_typ_count)
-            return ( u'%(post_status)s – %(total_comments)s Comments' + s ) % d
+            return ( u'%(post_status)s \u2013 %(total_comments)s Comments' + s ) % d
 
         default_post = { 'post_status': 'draft',
                          self.meta_data_dict['From']: self.blog_username }
@@ -278,7 +287,7 @@ class BlogIt:
         multicall = xmlrpclib.MultiCall(self.client)
         multicall.metaWeblog.getPost(id, username, password)
         multicall.wp.getCommentCount('', username, password, id)
-        if vim.eval('s:used_tags == [] || s:used_categories == []') != '0':
+        if vim.eval('s:used_tags == [] || s:used_categories == []') == '1':
             multicall.wp.getCategories('', username, password)
             multicall.wp.getTags('', username, password)
             d, comments, categories, tags = tuple(multicall())
@@ -337,7 +346,7 @@ class BlogIt:
 
         Can raise FilterException.
         """
-        if not vim.eval('exists("%s")' % vim_var) != '0':
+        if not vim.eval('exists("%s")' % vim_var) == '1':
             return text
         try:
             filter = vim.eval(vim_var)
@@ -436,9 +445,9 @@ class BlogIt:
 
     @property
     def blog_name(self):
-        if vim.eval("exists('b:blog_name')") != '0':
+        if vim.eval("exists('b:blog_name')") == '1':
             return vim.eval('b:blog_name')
-        elif vim.eval("exists('blog_name')") != '0':
+        elif vim.eval("exists('blog_name')") == '1':
             return vim.eval('blog_name')
         else:
             return 'blogit'

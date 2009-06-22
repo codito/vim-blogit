@@ -244,13 +244,10 @@ class BlogIt:
             sys.stderr.write("An error has occured: %s" % err)
 
     def list_edit(self):
-        try:
-            row,col = vim.current.window.cursor
-            id = vim.current.buffer[row-1].split()[0]
-            vim.command('bdelete')
-            self.command_edit(int(id))
-        except Exception:
-            return
+        row, col = vim.current.window.cursor
+        id = vim.current.buffer[row-1].split()[0]
+        vim.command('bdelete')
+        self.command_edit(int(id))
 
     def command_edit(self, id):
         """ edit a post """

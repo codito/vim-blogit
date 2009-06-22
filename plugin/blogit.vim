@@ -179,103 +179,39 @@ class BlogIt:
             except:
                 sys.stderr.write('%s' % e)
 
-    def getArguments(self, func, skip=0):
-        """
-        Get arguments of a function as a string.
-        skip is the number of skipped arguments.
-        """
-        try:
-            func = func.im_func
-        except AttributeError:
-            pass
-        else:
+    vimcommand_list = []
+
+    def vimcommand(f, register_to=vimcommand_list):
+        def getArguments(func, skip=0):
+            """
+            Get arguments of a function as a string.
+            skip is the number of skipped arguments.
+            """
             skip += 1
-        args, varargs, varkw, defaults = getargspec(func)
-        arguments = list(args)
-        if defaults:
-            index = len(arguments)-1
-            for default in reversed(defaults):
-                arguments[index] += "=%s" % default
-                index -= 1
-        if varargs:
-            arguments.append("*" + varargs)
-        if varkw:
-            arguments.append("**" + varkw)
-        return "%s" % " ".join(("<%s>" % s for s in arguments[skip:]))
+            args, varargs, varkw, defaults = getargspec(func)
+            arguments = list(args)
+            if defaults:
+                index = len(arguments)-1
+                for default in reversed(defaults):
+                    arguments[index] += "=%s" % default
+                    index -= 1
+            if varargs:
+                arguments.append("*" + varargs)
+            if varkw:
+                arguments.append("**" + varkw)
+            return "".join((" <%s>" % s for s in arguments[skip:]))
 
-    def command_help(self):
-        """ display this notice """
-        sys.stdout.write("Available commands:\n")
-        for attrname in dir(self):
-            if not attrname.startswith('command_'):
-                continue
-            attr = getattr(self, attrname)
-            if not isinstance(attr, MethodType):
-                continue
-            command = attrname[len('command_'):]
-            sys.stdout.write('   :Blogit %-20s %s\n' % ( '%s %s' %
-                    ( command, self.getArguments(attr) ), attr.__doc__ ))
-
-    def command_ls(self):
-        """ list all posts """
-        try:
-            allposts = self.client.metaWeblog.getRecentPosts('',
-                    self.blog_username, self.blog_password)
-            if not allposts:
-                sys.stderr.write("There are no posts.")
-                return
-            vim.command('botright new')
-            self.current_post = None
-            vim.current.buffer[0] = "%sID    Date%sTitle" % \
-                    ( ' ' * ( len(allposts[0]['postid']) - 2 ),
-                    ( ' ' * len(self.DateTime_to_str(
-                    allposts[0]['date_created_gmt'], '%x')) ) )
-            format = '%%%dd    %%s    %%s' % max(2, len(allposts[0]['postid']))
-            for p in allposts:
-                vim.current.buffer.append(format % (int(p['postid']),
-                        self.DateTime_to_str(p['date_created_gmt'], '%x'),
-                        p['title'].encode('utf-8')))
-            vim.command('setlocal buftype=nofile bufhidden=wipe nobuflisted ' +
-                    'noswapfile syntax=blogsyntax nomodifiable nowrap')
-            vim.current.window.cursor = (2, 0)
-            vim.command('nnoremap <buffer> <enter> :py blogit.list_edit()<cr>')
-            vim.command('nnoremap <buffer> gf :py blogit.list_edit()<cr>')
-        except Exception, err:
-            sys.stderr.write("An error has occured: %s" % err)
+        command = ( f.func_name.replace('command_', ':Blogit ') +
+                getArguments(f) )
+        f.vimcommand = '%-25s %s\n' % ( command, f.__doc__ )
+        register_to.append(f)
+        return f
 
     def list_edit(self):
         row, col = vim.current.window.cursor
         id = vim.current.buffer[row-1].split()[0]
         vim.command('bdelete')
         self.command_edit(int(id))
-
-    def command_edit(self, id):
-        """ edit a post """
-        try:
-            id = int(id)
-        except ValueError:
-            sys.stderr.write("'id' must be an integer value.")
-            return
-
-        try:
-            post = self.getPost(id)
-        except Fault, e:
-            sys.stderr.write('Blogit Fault: ' + e.faultString)
-        else:
-            vim.command('enew')
-            self.display_post(post)
-
-    def command_new(self):
-        """ create a new post """
-        vim.command('enew')
-        self.display_post()
-
-    def command_this(self):
-        """ make this a blog post """
-        if self.current_post is None:
-            self.display_post(new_text=vim.current.buffer[:])
-        else:
-            sys.stderr.write("Already editing a post.")
 
     meta_data_dict = { 'From': 'wp_author_display_name', 'Post-Id': 'postid',
             'Subject': 'title', 'Categories': 'categories',
@@ -387,18 +323,6 @@ class BlogIt:
         except Exception, e:
             raise self.FilterException(e.message, text, filter)
 
-    def command_commit(self):
-        """ commit current post """
-        self.sendArticle()
-
-    def command_push(self):
-        """ publish post """
-        self.sendArticle(push=1)
-
-    def command_unpush(self):
-        """ unpublish post """
-        self.sendArticle(push=0)
-
     def sendArticle(self, push=None):
 
         def sendPost(postid, post, push):
@@ -456,39 +380,6 @@ class BlogIt:
         except Fault, e:
             sys.stderr.write(e.faultString)
 
-    def command_rm(self, id):
-        """ remove a post """
-        try:
-            id = int(id)
-        except ValueError:
-            sys.stderr.write("'id' must be an integer value.")
-            return
-
-        if self.current_post and int(self.current_post['postid']) == int(id):
-            vim.command('bdelete')
-            self.current_post = None
-        try:
-            self.client.metaWeblog.deletePost('', id, self.blog_username,
-                                              self.blog_password)
-        except Fault, e:
-            sys.stderr.write(e.faultString)
-            return
-        sys.stdout.write('Article removed')
-
-    def command_categories(self):
-        """ list categories """
-        sys.stdout.write('Categories:\n  ' + '\n  '.join(self.getCategories())
-                         + '\n')
-
-    command_cat = command_categories
-
-    def command_tags(self):
-        """ list tags """
-        tags = [ tag['name'] for tag in self.client.wp.getTags('',
-                    self.blog_username, self.blog_password) ]
-        vim.command('let s:used_tags = %s' % tags)
-        sys.stdout.write('Tags:\n' + ', '.join(tags))
-
     def getCategories(self):
         """ Returns a list of used categories from the server (slow).
 
@@ -520,6 +411,126 @@ class BlogIt:
             return vim.eval('blog_name')
         else:
             return 'blogit'
+
+    @vimcommand
+    def command_ls(self):
+        """ list all posts """
+        try:
+            allposts = self.client.metaWeblog.getRecentPosts('',
+                    self.blog_username, self.blog_password)
+            if not allposts:
+                sys.stderr.write("There are no posts.")
+                return
+            vim.command('botright new')
+            self.current_post = None
+            vim.current.buffer[0] = "%sID    Date%sTitle" % \
+                    ( ' ' * ( len(allposts[0]['postid']) - 2 ),
+                    ( ' ' * len(self.DateTime_to_str(
+                    allposts[0]['date_created_gmt'], '%x')) ) )
+            format = '%%%dd    %%s    %%s' % max(2, len(allposts[0]['postid']))
+            for p in allposts:
+                vim.current.buffer.append(format % (int(p['postid']),
+                        self.DateTime_to_str(p['date_created_gmt'], '%x'),
+                        p['title'].encode('utf-8')))
+            vim.command('setlocal buftype=nofile bufhidden=wipe nobuflisted ' +
+                    'noswapfile syntax=blogsyntax nomodifiable nowrap')
+            vim.current.window.cursor = (2, 0)
+            vim.command('nnoremap <buffer> <enter> :py blogit.list_edit()<cr>')
+            vim.command('nnoremap <buffer> gf :py blogit.list_edit()<cr>')
+        except Exception, err:
+            sys.stderr.write("An error has occured: %s" % err)
+
+    @vimcommand
+    def command_new(self):
+        """ create a new post """
+        vim.command('enew')
+        self.display_post()
+
+    @vimcommand
+    def command_this(self):
+        """ make this a blog post """
+        if self.current_post is None:
+            self.display_post(new_text=vim.current.buffer[:])
+        else:
+            sys.stderr.write("Already editing a post.")
+
+    @vimcommand
+    def command_edit(self, id):
+        """ edit a post """
+        try:
+            id = int(id)
+        except ValueError:
+            sys.stderr.write("'id' must be an integer value.")
+            return
+
+        try:
+            post = self.getPost(id)
+        except Fault, e:
+            sys.stderr.write('Blogit Fault: ' + e.faultString)
+        else:
+            vim.command('enew')
+            self.display_post(post)
+
+    @vimcommand
+    def command_commit(self):
+        """ commit current post """
+        self.sendArticle()
+
+    @vimcommand
+    def command_push(self):
+        """ publish post """
+        self.sendArticle(push=1)
+
+    @vimcommand
+    def command_unpush(self):
+        """ unpublish post """
+        self.sendArticle(push=0)
+
+    @vimcommand
+    def command_rm(self, id):
+        """ remove a post """
+        try:
+            id = int(id)
+        except ValueError:
+            sys.stderr.write("'id' must be an integer value.")
+            return
+
+        if self.current_post and int(self.current_post['postid']) == int(id):
+            vim.command('bdelete')
+            self.current_post = None
+        try:
+            self.client.metaWeblog.deletePost('', id, self.blog_username,
+                                              self.blog_password)
+        except Fault, e:
+            sys.stderr.write(e.faultString)
+            return
+        sys.stdout.write('Article removed')
+
+    @vimcommand
+    def command_categories(self):
+        """ list categories """
+        sys.stdout.write('Categories:\n  ' + '\n  '.join(self.getCategories())
+                         + '\n')
+
+    @vimcommand
+    def command_cat(self): 
+        """ shortcut for categories """
+        self.command_categories()
+
+    @vimcommand
+    def command_tags(self):
+        """ list tags """
+        tags = [ tag['name'] for tag in self.client.wp.getTags('',
+                    self.blog_username, self.blog_password) ]
+        vim.command('let s:used_tags = %s' % tags)
+        sys.stdout.write('Tags:\n' + ', '.join(tags))
+
+    @vimcommand
+    def command_help(self):
+        """ display this notice """
+        sys.stdout.write("Available commands:\n")
+        for f in self.vimcommand_list:
+            sys.stdout.write('   ' + f.vimcommand)
 
 
 blogit = BlogIt()

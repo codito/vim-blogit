@@ -50,7 +50,7 @@
 "
 "       let blogit_username='Your blog user name'
 "       let blogit_password='Your blog password. Not the API-key.'
-"       let blogit_url='http://your.path.to/xmlrpc.php'
+"       let blogit_url='https://your.path.to/xmlrpc.php'
 "
 "   In addition you can set these settings in your vimrc:
 "
@@ -181,17 +181,16 @@ class BlogIt:
 
     def getArguments(self, func, skip=0):
         """
-        Get arguments of a function.
+        Get arguments of a function as a string.
         skip is the number of skipped arguments.
         """
         try:
             func = func.im_func
-            is_method = True
         except AttributeError:
-            is_method = False
-        args, varargs, varkw, defaults = getargspec(func)
-        if is_method:
+            pass
+        else:
             skip += 1
+        args, varargs, varkw, defaults = getargspec(func)
         arguments = list(args)
         if defaults:
             index = len(arguments)-1
@@ -214,7 +213,8 @@ class BlogIt:
             if not isinstance(attr, MethodType):
                 continue
             command = attrname[len('command_'):]
-            sys.stdout.write('Blogit %-20s %s\n' % ('%s %s' % (command, self.getArguments(attr)), attr.__doc__.strip().expandtabs(12)))
+            sys.stdout.write('   :Blogit %-20s %s\n' % ( '%s %s' %
+                    ( command, self.getArguments(attr) ), attr.__doc__ ))
 
     def command_ls(self):
         """ list all posts """

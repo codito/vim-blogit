@@ -82,7 +82,7 @@
 "   CTRL-X_CTRL-U) once the list of them is gotten via ":Blogit cat[egories]"
 "   and ":Blogit tags".
 "
-"   To use tags your WordPress needs to have the UTW-RPC[3] plugin installed 
+"   To use tags your WordPress needs to have the UTW-RPC[3] plugin installed
 "   (WordPress.com does).
 "
 " [1] http://johnmacfarlane.net/pandoc/
@@ -132,6 +132,7 @@ from time import mktime, strptime, strftime, localtime, gmtime
 from calendar import timegm
 from subprocess import Popen, CalledProcessError, PIPE
 from xmlrpclib import DateTime, Fault
+from inspect import getargspec
 from types import MethodType
 
 #####################
@@ -178,16 +179,45 @@ class BlogIt:
             except:
                 sys.stderr.write('%s' % e)
 
+    def getArguments(self, func, skip=0):
+        """
+        Get arguments of a function.
+        skip is the number of skipped arguments.
+        """
+        try:
+            func = func.im_func
+            is_method = True
+        except AttributeError:
+            is_method = False
+        args, varargs, varkw, defaults = getargspec(func)
+        if is_method:
+            skip += 1
+        arguments = list(args)
+        if defaults:
+            index = len(arguments)-1
+            for default in reversed(defaults):
+                arguments[index] += "=%s" % default
+                index -= 1
+        if varargs:
+            arguments.append("*" + varargs)
+        if varkw:
+            arguments.append("**" + varkw)
+        return "%s" % " ".join(("<%s>" % s for s in arguments[skip:]))
+
     def command_help(self):
-        """ Blogit help   \t display this notice """
+        """ display this notice """
         sys.stdout.write("Available commands:\n")
-        for command in [ 'ls', 'new', 'this', 'edit', 'commit', 'push', 
-                    'unpush', 'rm', 'categories', 'tags', 'help' ]:
-            sys.stdout.write('   %s\n' % getattr(self, 'command_' + command).\
-                    __doc__.strip().expandtabs(12))
+        for attrname in dir(self):
+            if not attrname.startswith('command_'):
+                continue
+            attr = getattr(self, attrname)
+            if not isinstance(attr, MethodType):
+                continue
+            command = attrname[len('command_'):]
+            sys.stdout.write('Blogit %-20s %s\n' % ('%s %s' % (command, self.getArguments(attr)), attr.__doc__.strip().expandtabs(12)))
 
     def command_ls(self):
-        """ Blogit ls   \t list all posts """
+        """ list all posts """
         try:
             allposts = self.client.metaWeblog.getRecentPosts('',
                     self.blog_username, self.blog_password)
@@ -223,7 +253,7 @@ class BlogIt:
             return
 
     def command_edit(self, id):
-        """ Blogit edit <id>   \t edit a post """
+        """ edit a post """
         try:
             id = int(id)
         except ValueError:
@@ -239,20 +269,20 @@ class BlogIt:
             self.display_post(post)
 
     def command_new(self):
-        """ Blogit new   \t create a new post """
+        """ create a new post """
         vim.command('enew')
         self.display_post()
 
     def command_this(self):
-        """ Blogit this   \t make this a blog post """
+        """ make this a blog post """
         if self.current_post is None:
             self.display_post(new_text=vim.current.buffer[:])
         else:
             sys.stderr.write("Already editing a post.")
 
-    meta_data_dict = { 'From': 'wp_author_display_name', 'Post-Id': 'postid', 
-            'Subject': 'title', 'Categories': 'categories', 
-            'Tags': 'mt_keywords', 'Date': 'date_created_gmt' 
+    meta_data_dict = { 'From': 'wp_author_display_name', 'Post-Id': 'postid',
+            'Subject': 'title', 'Categories': 'categories',
+            'Tags': 'mt_keywords', 'Date': 'date_created_gmt'
            }
 
     def display_post(self, post={}, new_text=None):
@@ -260,7 +290,7 @@ class BlogIt:
                          self.meta_data_dict['From']: self.blog_username }
         default_post.update(post)
         post = default_post
-        meta_data_f_dict = { 'Date': self.DateTime_to_str, 
+        meta_data_f_dict = { 'Date': self.DateTime_to_str,
                    'Categories': lambda L: ', '.join(L)
                  }
         vim.current.buffer[:] = None
@@ -273,7 +303,7 @@ class BlogIt:
                 val = ''
             if label in meta_data_f_dict:
                 val = meta_data_f_dict[label](val)
-            vim.current.buffer.append('%s: %s' % ( label, 
+            vim.current.buffer.append('%s: %s' % ( label,
                     str(val).encode('utf-8') ))
         vim.current.buffer[0] = None
         vim.current.buffer.append('')
@@ -361,15 +391,15 @@ class BlogIt:
             raise self.FilterException(e.message, text, filter)
 
     def command_commit(self):
-        """ Blogit commit   \t commit current post """
+        """ commit current post """
         self.sendArticle()
 
     def command_push(self):
-        """ Blogit push   \t publish post """
+        """ publish post """
         self.sendArticle(push=1)
 
     def command_unpush(self):
-        """ Blogit unpush   \t unpublish post """
+        """ unpublish post """
         self.sendArticle(push=0)
 
     def sendArticle(self, push=None):
@@ -403,7 +433,7 @@ class BlogIt:
                     break
 
             post = self.current_post.copy()
-            meta_data_f_dict = { 'Categories': split_comma, 
+            meta_data_f_dict = { 'Categories': split_comma,
                                  'Date': date_from_meta }
 
             for label, value in self.getMeta():
@@ -411,7 +441,7 @@ class BlogIt:
                     value = meta_data_f_dict[label](value)
                 post[self.meta_data_dict[label]] = value
 
-            push_dict = { 0: 'draft', 1: 'publish', 
+            push_dict = { 0: 'draft', 1: 'publish',
                           None: self.current_post['post_status'] }
             post['post_status'] = push_dict[push]
             if push is None:
@@ -430,7 +460,7 @@ class BlogIt:
             sys.stderr.write(e.faultString)
 
     def command_rm(self, id):
-        """ Blogit rm <id>   \t remove a post """
+        """ remove a post """
         try:
             id = int(id)
         except ValueError:
@@ -449,14 +479,14 @@ class BlogIt:
         sys.stdout.write('Article removed')
 
     def command_categories(self):
-        """ Blogit cat[egories]   \t list categories """
+        """ list categories """
         sys.stdout.write('Categories:\n  ' + '\n  '.join(self.getCategories())
                          + '\n')
 
     command_cat = command_categories
 
     def command_tags(self):
-        """ Blogit tags   \t list tags """
+        """ list tags """
         tags = [ tag['name'] for tag in self.client.wp.getTags('',
                     self.blog_username, self.blog_password) ]
         vim.command('let s:used_tags = %s' % tags)

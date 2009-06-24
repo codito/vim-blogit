@@ -205,6 +205,10 @@ class BlogIt:
         register_to.append(f)
         return f
 
+    def list_comments(self):
+        if vim.current.line.startswith('Status: '):
+            self.getComments(self.current_post['postid'])
+
     def list_edit(self):
         row, col = vim.current.window.cursor
         id = vim.current.buffer[row-1].split()[0]
@@ -272,6 +276,7 @@ class BlogIt:
         vim.command('set nomodified')
         vim.command('set textwidth=0')
         self.current_post = post
+        vim.command('nnoremap <buffer> gf :py blogit.list_comments()<cr>')
 
     def str_to_DateTime(self, text=''):
         if text == '':
@@ -305,6 +310,22 @@ class BlogIt:
         comments['post_status'] = d['post_status']
         d['blogit_status'] = comments
         return d
+
+    def getComments(self, id, offset=0):
+        # TODO
+        vim.command('enew')
+        for comment in self.client.wp.getComments('', blogit.blog_username, 
+                blogit.blog_password, [ id, '', offset, 1000 ]):
+            for header in ( 'status', 'author', 'comment_id', 'parent', 
+                        'date_created_gmt', 'type'  ):
+                vim.current.buffer.append('%s: %s' % 
+                        ( header, comment[header] ))
+            vim.current.buffer.append('')
+            for line in comment['content'].split('\n'):
+                vim.current.buffer.append(line.encode('utf-8'))
+            vim.current.buffer.append('=' * 78)
+            vim.current.buffer.append('')
+        vim.command('set nomodifiable')
 
     def getMeta(self):
         r = re.compile('^(.*?): (.*)$')

@@ -131,7 +131,7 @@ import vim, xmlrpclib, sys, re
 from time import mktime, strptime, strftime, localtime, gmtime
 from calendar import timegm
 from subprocess import Popen, CalledProcessError, PIPE
-from xmlrpclib import DateTime, Fault
+from xmlrpclib import DateTime, Fault, MultiCall
 from inspect import getargspec
 from types import MethodType
 
@@ -215,20 +215,34 @@ class BlogIt:
 
     meta_data_dict = { 'From': 'wp_author_display_name', 'Post-Id': 'postid',
             'Subject': 'title', 'Categories': 'categories',
-            'Tags': 'mt_keywords', 'Date': 'date_created_gmt'
+            'Tags': 'mt_keywords', 'Date': 'date_created_gmt', 
+            'Status': 'blogit_status',
            }
 
     def display_post(self, post={}, new_text=None):
+        def display_comment_count(d):
+            if d['awaiting_moderation'] > 0:
+                if d['spam'] > 0:
+                    s = u' (%(awaiting_moderation)s awaiting, %(spam)s spam)'
+                else:
+                    s = u'%(awaiting_moderation)s'
+            elif d['spam'] > 0:
+                s = u' (%(spam)s spam)'
+            else:
+                s = u''
+            return ( u'%(post_status)s – %(total_comments)s Comments' + s ) % d
+
         default_post = { 'post_status': 'draft',
                          self.meta_data_dict['From']: self.blog_username }
         default_post.update(post)
         post = default_post
         meta_data_f_dict = { 'Date': self.DateTime_to_str,
-                   'Categories': lambda L: ', '.join(L)
+                   'Categories': lambda L: ', '.join(L),
+                   'Status': display_comment_count
                  }
         vim.current.buffer[:] = None
         vim.command("setlocal ft=mail completefunc=CompleteCategories")
-        for label in [ 'From', 'Post-Id', 'Subject', 'Categories',
+        for label in [ 'From', 'Post-Id', 'Subject', 'Status', 'Categories',
                 'Tags', 'Date' ]:
             try:
                 val = post[self.meta_data_dict[label]]
@@ -237,7 +251,7 @@ class BlogIt:
             if label in meta_data_f_dict:
                 val = meta_data_f_dict[label](val)
             vim.current.buffer.append('%s: %s' % ( label,
-                    str(val).encode('utf-8') ))
+                    unicode(val).encode('utf-8') ))
         vim.current.buffer[0] = None
         vim.current.buffer.append('')
         if new_text is None:
@@ -276,8 +290,23 @@ class BlogIt:
             return ''
 
     def getPost(self, id):
-        return self.client.metaWeblog.getPost(id, self.blog_username,
-                                                  self.blog_password)
+        username, password = self.blog_username, self.blog_password
+        multicall = xmlrpclib.MultiCall(self.client)
+        multicall.metaWeblog.getPost(id, username, password)
+        multicall.wp.getCommentCount('', username, password, id)
+        if vim.eval('s:used_tags == [] || s:used_categories == []') != 0:
+            multicall.wp.getCategories('', username, password)
+            multicall.wp.getTags('', username, password)
+            d, comments, categories, tags = tuple(multicall())
+            vim.command('let s:used_tags = %s' % [ tag['name'] 
+                    for tag in tags ])
+            vim.command('let s:used_categories = %s' % [ cat['categoryName'] 
+                    for cat in categories ])
+        else:
+            d, comments = tuple(multicall())
+        comments['post_status'] = d['post_status']
+        d['blogit_status'] = comments
+        return d
 
     def getMeta(self):
         r = re.compile('^(.*?): (.*)$')
@@ -358,6 +387,8 @@ class BlogIt:
                                  'Date': date_from_meta }
 
             for label, value in self.getMeta():
+                if self.meta_data_dict[label].startswith('blogit_'):
+                    continue
                 if label in meta_data_f_dict:
                     value = meta_data_f_dict[label](value)
                 post[self.meta_data_dict[label]] = value

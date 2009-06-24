@@ -36,10 +36,8 @@
 "   Unpublish article
 " ":Blogit rm <id>"
 "   Remove an article
-" ":Blogit categories" or ":Blogit cat"
-"   Show categories list
 " ":Blogit tags"
-"   Show tags list
+"   Show tags and categories list
 " ":Blogit help"
 "   Display help
 "
@@ -79,8 +77,8 @@
 "   current line.
 "
 "   Categories and tags can be omni completed via *compl-function* (usually
-"   CTRL-X_CTRL-U) once the list of them is gotten via ":Blogit cat[egories]"
-"   and ":Blogit tags".
+"   CTRL-X_CTRL-U). The list of them is gotten automatically on first
+"   ":Blogit edit" and can be updated with ":Blogit tags".
 "
 "   To use tags your WordPress needs to have the UTW-RPC[3] plugin installed
 "   (WordPress.com does).
@@ -538,23 +536,19 @@ class BlogIt:
         sys.stdout.write('Article removed')
 
     @vimcommand
-    def command_categories(self):
-        """ list categories """
-        sys.stdout.write('Categories:\n  ' + '\n  '.join(self.getCategories())
-                         + '\n')
-
-    @vimcommand
-    def command_cat(self): 
-        """ shortcut for categories """
-        self.command_categories()
-
-    @vimcommand
     def command_tags(self):
-        """ list tags """
-        tags = [ tag['name'] for tag in self.client.wp.getTags('',
-                    self.blog_username, self.blog_password) ]
+        """ update and list tags and categories"""
+        username, password = self.blog_username, self.blog_password
+        multicall = xmlrpclib.MultiCall(self.client)
+        multicall.wp.getCategories('', username, password)
+        multicall.wp.getTags('', username, password)
+        categories, tags = tuple(multicall())
+        tags = [ tag['name'] for tag in tags ]
+        categories = [ cat['categoryName'] for cat in categories ]
         vim.command('let s:used_tags = %s' % tags)
-        sys.stdout.write('Tags:\n' + ', '.join(tags))
+        vim.command('let s:used_categories = %s' % categories)
+        sys.stdout.write('\n \n \nCategories\n==========\n \n' + ', '.join(categories))
+        sys.stdout.write('\n \n \nTags\n====\n \n' + ', '.join(tags))
 
     @vimcommand
     def command_help(self):

@@ -292,7 +292,7 @@ class BlogIt:
         multicall = xmlrpclib.MultiCall(self.client)
         multicall.metaWeblog.getPost(id, username, password)
         multicall.wp.getCommentCount('', username, password, id)
-        if vim.eval('s:used_tags == [] || s:used_categories == []') != 0:
+        if vim.eval('s:used_tags == [] || s:used_categories == []') != '0':
             multicall.wp.getCategories('', username, password)
             multicall.wp.getTags('', username, password)
             d, comments, categories, tags = tuple(multicall())

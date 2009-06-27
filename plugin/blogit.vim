@@ -184,8 +184,14 @@ class BlogIt:
     def list_edit(self):
         row, col = vim.current.window.cursor
         id = vim.current.buffer[row-1].split()[0]
-        vim.command('bdelete')
-        self.command_edit(int(id))
+        try:
+            id = int(id)
+        except ValueError:
+            vim.command('bdelete')
+            self.command_new()
+        else:
+            vim.command('bdelete')
+            self.command_edit(id)
 
     meta_data_dict = { 'From': 'wp_author_display_name', 'Post-Id': 'postid',
             'Subject': 'title', 'Categories': 'categories',

@@ -177,34 +177,6 @@ class BlogIt:
             except:
                 sys.stderr.write('%s' % e)
 
-    vimcommand_list = []
-
-    def vimcommand(f, register_to=vimcommand_list):
-        def getArguments(func, skip=0):
-            """
-            Get arguments of a function as a string.
-            skip is the number of skipped arguments.
-            """
-            skip += 1
-            args, varargs, varkw, defaults = getargspec(func)
-            arguments = list(args)
-            if defaults:
-                index = len(arguments)-1
-                for default in reversed(defaults):
-                    arguments[index] += "=%s" % default
-                    index -= 1
-            if varargs:
-                arguments.append("*" + varargs)
-            if varkw:
-                arguments.append("**" + varkw)
-            return "".join((" <%s>" % s for s in arguments[skip:]))
-
-        command = ( f.func_name.replace('command_', ':Blogit ') +
-                getArguments(f) )
-        f.vimcommand = '%-25s %s\n' % ( command, f.__doc__ )
-        register_to.append(f)
-        return f
-
     def list_comments(self):
         if vim.current.line.startswith('Status: '):
             self.getComments(self.current_post['postid'])
@@ -461,6 +433,34 @@ class BlogIt:
             return vim.eval('blog_name')
         else:
             return 'blogit'
+
+    vimcommand_list = []
+
+    def vimcommand(f, register_to=vimcommand_list):
+        def getArguments(func, skip=0):
+            """
+            Get arguments of a function as a string.
+            skip is the number of skipped arguments.
+            """
+            skip += 1
+            args, varargs, varkw, defaults = getargspec(func)
+            arguments = list(args)
+            if defaults:
+                index = len(arguments)-1
+                for default in reversed(defaults):
+                    arguments[index] += "=%s" % default
+                    index -= 1
+            if varargs:
+                arguments.append("*" + varargs)
+            if varkw:
+                arguments.append("**" + varkw)
+            return "".join((" <%s>" % s for s in arguments[skip:]))
+
+        command = ( f.func_name.replace('command_', ':Blogit ') +
+                getArguments(f) )
+        f.vimcommand = '%-25s %s\n' % ( command, f.__doc__ )
+        register_to.append(f)
+        return f
 
     @vimcommand
     def command_ls(self):

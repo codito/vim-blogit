@@ -201,15 +201,16 @@ class BlogIt:
 
     def display_post(self, post={}, new_text=None):
         def display_comment_count(d):
-            if d['awaiting_moderation'] > 0:
-                if d['spam'] > 0:
-                    s = u' (%(awaiting_moderation)s awaiting, %(spam)s spam)'
-                else:
-                    s = u'%(awaiting_moderation)s'
-            elif d['spam'] > 0:
-                s = u' (%(spam)s spam)'
-            else:
+            if d == '':
+                return u'new'
+            comment_typ_count = [ '%s %s' % (key, text) 
+                    for key, text in ( ( 'awaiting_moderation', 'awaiting' ),
+                            ( 'spam', 'spam' ) ) 
+                    if d[key] > 0 ]
+            if comment_typ_count == []:
                 s = u''
+            else:
+                s = u' (%s)' % ', '.join(comment_typ_count)
             return ( u'%(post_status)s – %(total_comments)s Comments' + s ) % d
 
         default_post = { 'post_status': 'draft',

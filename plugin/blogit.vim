@@ -191,7 +191,9 @@ class BlogIt:
             self.command_new()
         else:
             vim.command('bdelete')
-            self.command_edit(id)
+            # To access vim s:variables we can't call this directly 
+            # via command_edit
+            vim.command('Blogit edit %s' % id)
 
     meta_data_dict = { 'From': 'wp_author_display_name', 'Post-Id': 'postid',
             'Subject': 'title', 'Categories': 'categories',

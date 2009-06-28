@@ -134,6 +134,8 @@ except ImportError:
     from minimock import Mock
     vim = Mock('vim')
     import doctest
+else:
+    doctest = False
 import xmlrpclib, sys, re
 from time import mktime, strptime, strftime, localtime, gmtime
 from calendar import timegm
@@ -598,3 +600,6 @@ class BlogIt:
 
 
 blogit = BlogIt()
+
+if doctest:
+    doctest.testmod()

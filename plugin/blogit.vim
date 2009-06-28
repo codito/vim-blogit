@@ -270,14 +270,16 @@ class BlogIt:
         self.current_post = post
         vim.command('nnoremap <buffer> gf :py blogit.list_comments()<cr>')
 
-    def str_to_DateTime(self, text=''):
+    @staticmethod
+    def str_to_DateTime(text='', format='%c'):
         if text == '':
             text = localtime()
         else:
             text = strptime(text, '%c')
         return DateTime(strftime('%Y%m%dT%H:%M:%S', gmtime(mktime(text))))
 
-    def DateTime_to_str(self, date, format='%c'):
+    @staticmethod
+    def DateTime_to_str(date, format='%c'):
         try:
             return strftime(format, localtime(timegm(strptime(str(date),
                                               '%Y%m%dT%H:%M:%S'))))

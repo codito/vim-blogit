@@ -272,14 +272,27 @@ class BlogIt:
 
     @staticmethod
     def str_to_DateTime(text='', format='%c'):
+        """
+        >>> BlogIt.str_to_DateTime('Sun Jun 28 19:38:58 2009', 
+        ...         '%a %b %d %H:%M:%S %Y')  #doctest: +ELLIPSIS
+        <DateTime '20090628T17:38:58' at ...>
+        """
         if text == '':
             text = localtime()
         else:
-            text = strptime(text, '%c')
+            text = strptime(text, format)
         return DateTime(strftime('%Y%m%dT%H:%M:%S', gmtime(mktime(text))))
 
     @staticmethod
     def DateTime_to_str(date, format='%c'):
+        """
+        >>> BlogIt.DateTime_to_str(DateTime('20090628T17:38:58'), 
+        ...         '%a %b %d %H:%M:%S %Y')
+        'Sun Jun 28 19:38:58 2009'
+
+        >>> BlogIt.DateTime_to_str('invalid input')
+        ''
+        """
         try:
             return strftime(format, localtime(timegm(strptime(str(date),
                                               '%Y%m%dT%H:%M:%S'))))
@@ -428,6 +441,39 @@ class BlogIt:
         """ Returns a list of used categories from the server (slow).
 
         Side effect: Sets vim variable s:used_categories for omni-completion.
+
+        >>> vim.command = Mock('vim.command')
+        >>> vim.eval = Mock('vim.eval', returns_iter=[ 'user', 'passwd' ])
+        >>> blogit.client = Mock('client')
+        >>> blogit.client.wp.getCategories.mock_returns = []
+        >>> blogit.blog_name = 'blogit'
+        >>> blogit.getCategories()
+        Called vim.eval('blogit_username')
+        Called vim.eval('blogit_password')
+        Called client.wp.getCategories('', 'user', 'passwd')
+        Called vim.command('let s:used_categories = []')
+        []
+
+        >>> vim.eval = Mock('vim.eval', returns_iter=[ 'user', 'passwd' ])
+        >>> blogit.client.wp.getCategories.mock_returns = [ 
+        ...         { 'categoryName': 'a' } ]
+        >>> blogit.getCategories()
+        Called vim.eval('blogit_username')
+        Called vim.eval('blogit_password')
+        Called client.wp.getCategories('', 'user', 'passwd')
+        Called vim.command("let s:used_categories = ['a']")
+        ['a']
+
+        >>> vim.eval = Mock('vim.eval', returns_iter=[ 'user', 'passwd' ])
+        >>> blogit.client.wp.getCategories.mock_returns = [ 
+        ...         { 'categoryName': 'a' }, 
+        ...         { 'categoryName': 'b', 'catter': 'something else' } ]
+        >>> blogit.getCategories()
+        Called vim.eval('blogit_username')
+        Called vim.eval('blogit_password')
+        Called client.wp.getCategories('', 'user', 'passwd')
+        Called vim.command("let s:used_categories = ['a', 'b']")
+        ['a', 'b']
         """
         categories = [ cat['categoryName']
                 for cat in self.client.wp.getCategories('',
@@ -445,10 +491,25 @@ class BlogIt:
 
     @property
     def blog_url(self):
+        """
+        >>> vim.eval.mock_returns = 'http://example.com'
+        >>> blogit.blog_name='blogit'
+        >>> blogit.blog_url
+        Called vim.eval('blogit_url')
+        'http://example.com'
+        """
         return vim.eval(self.blog_name + '_url')
 
     @property
     def blog_name(self):
+        """
+        >>> vim.eval = Mock('vim.eval')
+        >>> blogit.blog_name
+        Called vim.eval("exists('b:blog_name')")
+        Called vim.eval("exists('blog_name')")
+        'blogit'
+
+        """
         if vim.eval("exists('b:blog_name')") == '1':
             return vim.eval('b:blog_name')
         elif vim.eval("exists('blog_name')") == '1':

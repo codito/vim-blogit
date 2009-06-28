@@ -95,7 +95,7 @@ command! -nargs=* Blogit exec('py blogit.command(<f-args>)')
 let s:used_categories = []
 let s:used_tags = []
 
-function CompleteCategories(findstart, base)
+function BlogitCompleteCategories(findstart, base)
     " based on code from :he complete-functions
     if a:findstart
         " locate the start of the word
@@ -224,7 +224,7 @@ class BlogIt:
                    'Status': display_comment_count
                  }
         vim.current.buffer[:] = None
-        vim.command("setlocal ft=mail completefunc=CompleteCategories")
+        vim.command("setlocal ft=mail completefunc=BlogitCompleteCategories")
         for label in [ 'From', 'Post-Id', 'Subject', 'Status', 'Categories',
                 'Tags', 'Date' ]:
             try:

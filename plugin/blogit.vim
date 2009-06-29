@@ -274,7 +274,11 @@ class BlogIt:
     def str_to_DateTime(text='', format='%c'):
         """
         >>> BlogIt.str_to_DateTime('Sun Jun 28 19:38:58 2009', 
-        ...         '%a %b %d %H:%M:%S %Y')  #doctest: +ELLIPSIS
+        ...         '%a %b %d %H:%M:%S %Y')             #doctest: +ELLIPSIS
+        <DateTime '20090628T17:38:58' at ...>
+
+        >>> BlogIt.str_to_DateTime(BlogIt.DateTime_to_str(
+        ...         DateTime('20090628T17:38:58')))     #doctest: +ELLIPSIS
         <DateTime '20090628T17:38:58' at ...>
         """
         if text == '':

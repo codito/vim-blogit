@@ -348,9 +348,35 @@ class BlogIt:
                 yield m.group(1, 2)
 
     def getText(self, start_text):
-        """
+        r"""
 
         Can raise FilterException.
+
+        >>> vim.current.buffer = [ 'one', 'two', 'tree', 'four' ]
+
+        >>> blogit.getText(0)
+        Called vim.eval('exists("blogit_format")')
+        ['one\ntwo\ntree\nfour']
+
+        >>> blogit.getText(1)
+        Called vim.eval('exists("blogit_format")')
+        ['two\ntree\nfour']
+
+        >>> blogit.getText(4)
+        Called vim.eval('exists("blogit_format")')
+        ['']
+
+        >>> vim.eval = Mock('vim.eval', returns_iter=['1', 'sort'])
+        >>> blogit.getText(0)
+        Called vim.eval('exists("blogit_format")')
+        Called vim.eval('blogit_format')
+        ['four\none\ntree\ntwo\n']
+
+        >>> vim.eval = Mock('vim.eval', returns_iter=['1', 'false'])
+        >>> blogit.getText(0)     # can't get this to work :'(
+        Traceback (most recent call last):
+            ...
+        FilterException
         """
         text = '\n'.join(vim.current.buffer[start_text:])
         return map(self.format, text.split('\n<!--more-->\n\n'))

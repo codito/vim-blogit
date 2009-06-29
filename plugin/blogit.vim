@@ -441,50 +441,6 @@ class BlogIt:
         except Fault, e:
             sys.stderr.write(e.faultString)
 
-    def getCategories(self):
-        """ Returns a list of used categories from the server (slow).
-
-        Side effect: Sets vim variable s:used_categories for omni-completion.
-
-        >>> vim.command = Mock('vim.command')
-        >>> vim.eval = Mock('vim.eval', returns_iter=[ 'user', 'passwd' ])
-        >>> blogit.client = Mock('client')
-        >>> blogit.client.wp.getCategories.mock_returns = []
-        >>> blogit.blog_name = 'blogit'
-        >>> blogit.getCategories()
-        Called vim.eval('blogit_username')
-        Called vim.eval('blogit_password')
-        Called client.wp.getCategories('', 'user', 'passwd')
-        Called vim.command('let s:used_categories = []')
-        []
-
-        >>> vim.eval = Mock('vim.eval', returns_iter=[ 'user', 'passwd' ])
-        >>> blogit.client.wp.getCategories.mock_returns = [ 
-        ...         { 'categoryName': 'a' } ]
-        >>> blogit.getCategories()
-        Called vim.eval('blogit_username')
-        Called vim.eval('blogit_password')
-        Called client.wp.getCategories('', 'user', 'passwd')
-        Called vim.command("let s:used_categories = ['a']")
-        ['a']
-
-        >>> vim.eval = Mock('vim.eval', returns_iter=[ 'user', 'passwd' ])
-        >>> blogit.client.wp.getCategories.mock_returns = [ 
-        ...         { 'categoryName': 'a' }, 
-        ...         { 'categoryName': 'b', 'catter': 'something else' } ]
-        >>> blogit.getCategories()
-        Called vim.eval('blogit_username')
-        Called vim.eval('blogit_password')
-        Called client.wp.getCategories('', 'user', 'passwd')
-        Called vim.command("let s:used_categories = ['a', 'b']")
-        ['a', 'b']
-        """
-        categories = [ cat['categoryName']
-                for cat in self.client.wp.getCategories('',
-                    self.blog_username, self.blog_password) ]
-        vim.command('let s:used_categories = %s' % categories)
-        return categories
-
     @property
     def blog_username(self):
         return vim.eval(self.blog_name + '_username')

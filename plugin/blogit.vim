@@ -339,9 +339,14 @@ class BlogIt:
         vim.command('set nomodifiable')
 
     def getMeta(self):
+        """
+        >>> vim.current.buffer = [ 'tag: value', '', 'body: novalue' ]
+        >>> list(blogit.getMeta())
+        [('tag', 'value')]
+        """
         r = re.compile('^(.*?): (.*)$')
         for line in vim.current.buffer:
-            if line.rstrip == '':
+            if line.rstrip() == '':
                 return
             m = r.match(line)
             if m:

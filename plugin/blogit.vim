@@ -175,6 +175,21 @@ class BlogIt:
     current_post = property(get_current_post, set_current_post)
 
     def command(self, command='help', *args):
+        """
+        >>> xmlrpclib = Mock('xmlrpclib')
+        >>> sys.stderr = Mock('stderr')
+        >>> blogit.command('non-existant')
+        Called vim.eval('blogit_url')
+        Called stderr.write('No such command: non-existant')
+
+        >>> def f(x): print 'got %s' % x
+        >>> blogit.command_mocktest = f
+        >>> blogit.command('mocktest')
+        Called stderr.write('Command mocktest takes 0 arguments')
+
+        >>> blogit.command('mocktest', 2)
+        got 2
+        """
         if self.client is None:
             self.connect()
         try:
@@ -193,6 +208,20 @@ class BlogIt:
             self.getComments(self.current_post['postid'])
 
     def list_edit(self):
+        """
+        >>> vim.command = Mock('vim.command')
+        >>> vim.current.window.cursor = (1, 2)
+        >>> vim.current.buffer = [ '12 random text' ]
+        >>> blogit.list_edit()
+        Called vim.command('bdelete')
+        Called vim.command('Blogit edit 12')
+
+        >>> vim.current.buffer = [ 'no blog id 12' ]
+        >>> blogit.command_new = Mock('self.command_new')
+        >>> blogit.list_edit()
+        Called vim.command('bdelete')
+        Called self.command_new()
+        """
         row, col = vim.current.window.cursor
         id = vim.current.buffer[row-1].split()[0]
         try:
@@ -273,6 +302,9 @@ class BlogIt:
     @staticmethod
     def str_to_DateTime(text='', format='%c'):
         """
+        >>> BlogIt.str_to_DateTime()                    #doctest: +ELLIPSIS
+        <DateTime ...>
+
         >>> BlogIt.str_to_DateTime('Sun Jun 28 19:38:58 2009', 
         ...         '%a %b %d %H:%M:%S %Y')             #doctest: +ELLIPSIS
         <DateTime '20090628T17:38:58' at ...>

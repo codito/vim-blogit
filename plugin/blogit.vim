@@ -336,6 +336,19 @@ class BlogIt:
             return ''
 
     def getPost(self, id):
+        """
+        >>> blogit.blog_username, blogit.blog_password = 'user', 'password'
+        >>> xmlrpclib.MultiCall = Mock('xmlrpclib.MultiCall', returns=Mock(
+        ...         'multicall', returns=[{'post_status': 'draft'}, {}]))
+        >>> d = blogit.getPost(42)    #doctest: +ELLIPSIS
+        Called xmlrpclib.MultiCall(<Mock 0x... client>)
+        Called multicall.metaWeblog.getPost(42, 'user', 'password')
+        Called multicall.wp.getCommentCount('', 'user', 'password', 42)
+        Called vim.eval('s:used_tags == [] || s:used_categories == []')
+        Called multicall()
+        >>> sorted(d.items())
+        [('blogit_status', {'post_status': 'draft'}), ('post_status', 'draft')]
+        """
         username, password = self.blog_username, self.blog_password
         multicall = xmlrpclib.MultiCall(self.client)
         multicall.metaWeblog.getPost(id, username, password)
@@ -355,6 +368,21 @@ class BlogIt:
         return d
 
     def getComments(self, id, offset=0):
+        """
+        >>> vim.command = Mock('vim.command')
+        >>> blogit.client = Mock('client')
+        >>> blogit.client.wp.getComments = Mock('getComments', returns=[])
+        >>> blogit.getComments(42)
+        Called vim.command('enew')
+        Called vim.eval('blogit_username')
+        Called vim.eval('blogit_password')
+        Called getComments(
+            '',
+            'http://example.com',
+            'http://example.com',
+            [42, '', 0, 1000])
+        Called vim.command('set nomodifiable')
+        """
         # TODO
         vim.command('enew')
         for comment in self.client.wp.getComments('', blogit.blog_username, 

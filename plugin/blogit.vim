@@ -454,9 +454,41 @@ class BlogIt:
             return e.input_text
 
     def format(self, text, vim_var='blogit_format'):
-        """ Filter text with command in vim_var.
+        r""" Filter text with command in vim_var.
 
         Can raise FilterException.
+
+        >>> blogit.format('some random text')
+        Called vim.eval('exists("blogit_format")')
+        'some random text'
+
+        >>> old = vim.eval
+        >>> vim.eval = Mock('vim.eval', returns_iter=[ '1', 'false' ])
+        >>> blogit.format('some random text')
+        Traceback (most recent call last):
+            ...
+        FilterException
+
+        >>> vim.eval = Mock('vim.eval', returns_iter=[ '1', 'rev' ])
+        >>> blogit.format('')
+        Called vim.eval('exists("blogit_format")')
+        Called vim.eval('blogit_format')
+        ''
+
+        >>> vim.eval = Mock('vim.eval', returns_iter=[ '1', 'rev' ])
+        >>> blogit.format('some random text')
+        Called vim.eval('exists("blogit_format")')
+        Called vim.eval('blogit_format')
+        'txet modnar emos\n'
+
+        >>> vim.eval = Mock('vim.eval', returns_iter=[ '1', 'rev' ])
+        >>> blogit.format('some random text\nwith a second line')
+        Called vim.eval('exists("blogit_format")')
+        Called vim.eval('blogit_format')
+        'txet modnar emos\nenil dnoces a htiw\n'
+
+        >>> vim.eval = old
+
         """
         if not vim.eval('exists("%s")' % vim_var) == '1':
             return text

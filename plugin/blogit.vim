@@ -447,6 +447,19 @@ class BlogIt:
         return map(self.format, text.split('\n<!--more-->\n\n'))
 
     def unformat(self, text):
+        r"""
+        >>> old = vim.eval
+        >>> vim.eval = Mock('vim.eval', returns_iter=[ '1', 'false' ])
+        >>> blogit.unformat('some random text')    
+        ...         #doctest: +NORMALIZE_WHITESPACE
+        Called vim.eval('exists("blogit_unformat")')
+        Called vim.eval('blogit_unformat')
+        Called stderr.write('Blogit: Error happend while filtering 
+                with:false\n')
+        'some random text'
+
+        >>> vim.eval = old
+        """
         try:
             return self.format(text, 'blogit_unformat')
         except self.FilterException, e:

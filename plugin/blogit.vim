@@ -540,9 +540,32 @@ class BlogIt:
         else:
             return 'blogit'
 
-    vimcommand_list = []
+    vimcommand_help = []
 
-    def vimcommand(f, register_to=vimcommand_list):
+    def vimcommand(f, register_to=vimcommand_help):
+        r"""
+        >>> class C:
+        ...     def command_f(self):
+        ...         ''' A method. '''
+        ...         print "f should not be executed."
+        ...     def command_g(self, one, two):
+        ...         ''' A method with options. '''
+        ...         print "g should not be executed."
+        ...
+        >>> L = []
+        >>> BlogIt.vimcommand(C.command_f, L)
+        <unbound method C.command_f>
+        >>> L
+        [':Blogit f                  A method. \n']
+
+        >>> BlogIt.vimcommand(C.command_g, L)
+        <unbound method C.command_g>
+        >>> L     #doctest: +NORMALIZE_WHITESPACE
+        [':Blogit f                  A method. \n', 
+         ':Blogit g <one> <two>      A method with options. \n']
+        
+        """
+
         def getArguments(func, skip=0):
             """
             Get arguments of a function as a string.
@@ -564,8 +587,7 @@ class BlogIt:
 
         command = ( f.func_name.replace('command_', ':Blogit ') +
                 getArguments(f) )
-        f.vimcommand = '%-25s %s\n' % ( command, f.__doc__ )
-        register_to.append(f)
+        register_to.append('%-25s %s\n' % ( command, f.__doc__ ))
         return f
 
     @vimcommand
@@ -681,8 +703,12 @@ class BlogIt:
     def command_help(self):
         """ display this notice """
         sys.stdout.write("Available commands:\n")
-        for f in self.vimcommand_list:
-            sys.stdout.write('   ' + f.vimcommand)
+        for f in self.vimcommand_help:
+            sys.stdout.write('   ' + f)
+
+    # needed for testing. Prevents beeing used as a decorator if it isn't at
+    # the end.
+    vimcommand = staticmethod(vimcommand)
 
 
 blogit = BlogIt()

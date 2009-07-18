@@ -17,8 +17,8 @@
 " Maintainer:   Romain Bignon
 " Contributor:  Adam Schmalhofer
 " URL:          http://symlink.me/wiki/blogit
-" Version:      1.1
-" Last Change:  2009 June 21
+" Version:      1.2
+" Last Change:  2009 July 18
 "
 " Commands :
 " ":Blogit ls"

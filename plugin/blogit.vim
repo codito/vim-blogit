@@ -231,13 +231,13 @@ class BlogIt:
             self.command_new()
         else:
             vim.command('bdelete')
-            # To access vim s:variables we can't call this directly 
+            # To access vim s:variables we can't call this directly
             # via command_edit
             vim.command('Blogit edit %s' % id)
 
     meta_data_dict = { 'From': 'wp_author_display_name', 'Post-Id': 'postid',
             'Subject': 'title', 'Categories': 'categories',
-            'Tags': 'mt_keywords', 'Date': 'date_created_gmt', 
+            'Tags': 'mt_keywords', 'Date': 'date_created_gmt',
             'Status': 'blogit_status',
            }
 
@@ -245,9 +245,9 @@ class BlogIt:
         def display_comment_count(d):
             if d == '':
                 return u'new'
-            comment_typ_count = [ '%s %s' % (key, text) 
+            comment_typ_count = [ '%s %s' % (key, text)
                     for key, text in ( ( 'awaiting_moderation', 'awaiting' ),
-                            ( 'spam', 'spam' ) ) 
+                            ( 'spam', 'spam' ) )
                     if d[key] > 0 ]
             if comment_typ_count == []:
                 s = u''
@@ -305,7 +305,7 @@ class BlogIt:
         >>> BlogIt.str_to_DateTime()                    #doctest: +ELLIPSIS
         <DateTime ...>
 
-        >>> BlogIt.str_to_DateTime('Sun Jun 28 19:38:58 2009', 
+        >>> BlogIt.str_to_DateTime('Sun Jun 28 19:38:58 2009',
         ...         '%a %b %d %H:%M:%S %Y')             #doctest: +ELLIPSIS
         <DateTime '20090628T17:38:58' at ...>
 
@@ -322,7 +322,7 @@ class BlogIt:
     @staticmethod
     def DateTime_to_str(date, format='%c'):
         """
-        >>> BlogIt.DateTime_to_str(DateTime('20090628T17:38:58'), 
+        >>> BlogIt.DateTime_to_str(DateTime('20090628T17:38:58'),
         ...         '%a %b %d %H:%M:%S %Y')
         'Sun Jun 28 19:38:58 2009'
 
@@ -357,9 +357,9 @@ class BlogIt:
             multicall.wp.getCategories('', username, password)
             multicall.wp.getTags('', username, password)
             d, comments, categories, tags = tuple(multicall())
-            vim.command('let s:used_tags = %s' % [ tag['name'] 
+            vim.command('let s:used_tags = %s' % [ tag['name']
                     for tag in tags ])
-            vim.command('let s:used_categories = %s' % [ cat['categoryName'] 
+            vim.command('let s:used_categories = %s' % [ cat['categoryName']
                     for cat in categories ])
         else:
             d, comments = tuple(multicall())
@@ -380,16 +380,18 @@ class BlogIt:
             '',
             'http://example.com',
             'http://example.com',
-            [42, '', 0, 1000])
+            {'post_id': 42, 'number': 1000, 'offset': 0})
         Called vim.command('set nomodifiable')
         """
         # TODO
         vim.command('enew')
-        for comment in self.client.wp.getComments('', blogit.blog_username, 
-                blogit.blog_password, [ id, '', offset, 1000 ]):
-            for header in ( 'status', 'author', 'comment_id', 'parent', 
+        for comment in self.client.wp.getComments('', blogit.blog_username,
+                blogit.blog_password, {'post_id': id,
+                                       'offset': offset,
+                                       'number': 1000}):
+            for header in ( 'status', 'author', 'comment_id', 'parent',
                         'date_created_gmt', 'type'  ):
-                vim.current.buffer.append('%s: %s' % 
+                vim.current.buffer.append('%s: %s' %
                         ( header, comment[header] ))
             vim.current.buffer.append('')
             for line in comment['content'].split('\n'):
@@ -450,11 +452,11 @@ class BlogIt:
         r"""
         >>> old = vim.eval
         >>> vim.eval = Mock('vim.eval', returns_iter=[ '1', 'false' ])
-        >>> blogit.unformat('some random text')    
+        >>> blogit.unformat('some random text')
         ...         #doctest: +NORMALIZE_WHITESPACE
         Called vim.eval('exists("blogit_unformat")')
         Called vim.eval('blogit_unformat')
-        Called stderr.write('Blogit: Error happend while filtering 
+        Called stderr.write('Blogit: Error happend while filtering
                 with:false\n')
         'some random text'
 
@@ -634,9 +636,9 @@ class BlogIt:
         >>> BlogIt.vimcommand(C.command_g, L)
         <unbound method C.command_g>
         >>> L     #doctest: +NORMALIZE_WHITESPACE
-        [':Blogit f                  A method. \n', 
+        [':Blogit f                  A method. \n',
          ':Blogit g <one> <two>      A method with options. \n']
-        
+
         """
 
         def getArguments(func, skip=0):

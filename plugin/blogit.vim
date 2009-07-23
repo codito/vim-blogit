@@ -381,7 +381,7 @@ class BlogIt:
             'http://example.com',
             'http://example.com',
             {'post_id': 42, 'number': 1000, 'offset': 0})
-        Called vim.command('set nomodifiable')
+        Called vim.command('set nomodifiable nomodified')
         """
         # TODO
         vim.command('enew')
@@ -398,7 +398,7 @@ class BlogIt:
                 vim.current.buffer.append(line.encode('utf-8'))
             vim.current.buffer.append('=' * 78)
             vim.current.buffer.append('')
-        vim.command('set nomodifiable')
+        vim.command('set nomodifiable nomodified')
 
     def getMeta(self):
         """

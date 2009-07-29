@@ -402,10 +402,9 @@ class BlogIt:
         """
         # TODO
         vim.command('enew')
-        for comment in self.client.wp.getComments('', self.blog_username,
-                blogit.blog_password, {'post_id': id,
-                                       'offset': offset,
-                                       'number': 1000}):
+        for comment in reversed(self.client.wp.getComments('', 
+                self.blog_username, blogit.blog_password, 
+                { 'post_id': id, 'offset': offset, 'number': 1000 })):
             self.append_comment_to_buffer(comment)
         self.append_comment_to_buffer()
         vim.command('setlocal nomodifiable nomodified linebreak')

@@ -370,35 +370,65 @@ class BlogIt:
     def getComments(self, id, offset=0):
         """
         >>> vim.command = Mock('vim.command')
+        >>> blogit.blog_username = 'User Name'
+        >>> blogit.append_comment_to_buffer = Mock('append_comment_to_buffer')
         >>> blogit.client = Mock('client')
         >>> blogit.client.wp.getComments = Mock('getComments', returns=[])
         >>> blogit.getComments(42)
         Called vim.command('enew')
-        Called vim.eval('blogit_username')
         Called vim.eval('blogit_password')
         Called getComments(
             '',
-            'http://example.com',
+            'User Name',
             'http://example.com',
             {'post_id': 42, 'number': 1000, 'offset': 0})
+        Called append_comment_to_buffer()
         Called vim.command('set nomodifiable nomodified')
         """
         # TODO
         vim.command('enew')
-        for comment in self.client.wp.getComments('', blogit.blog_username,
+        for comment in self.client.wp.getComments('', self.blog_username,
                 blogit.blog_password, {'post_id': id,
                                        'offset': offset,
                                        'number': 1000}):
-            for header in ( 'status', 'author', 'comment_id', 'parent',
-                        'date_created_gmt', 'type'  ):
-                vim.current.buffer.append('%s: %s' %
-                        ( header, comment[header] ))
-            vim.current.buffer.append('')
-            for line in comment['content'].split('\n'):
-                vim.current.buffer.append(line.encode('utf-8'))
-            vim.current.buffer.append('=' * 78)
-            vim.current.buffer.append('')
+            self.append_comment_to_buffer(comment)
+        self.append_comment_to_buffer()
         vim.command('set nomodifiable nomodified')
+
+    def append_comment_to_buffer(self, comment=None):
+        """
+        Formats and appends a given comment to the current buffer. Appends
+        an comment template if None is given.
+
+        >>> vim.current.buffer = Mock('buffer')
+        >>> blogit.blog_username = 'User Name'
+        >>> blogit.append_comment_to_buffer()   #doctest: +NORMALIZE_WHITESPACE
+        Called buffer.append('status: new')
+        Called buffer.append('author: User Name')
+        Called buffer.append('comment_id: ')
+        Called buffer.append('parent: 0')
+        Called buffer.append('date_created_gmt: ')
+        Called buffer.append('type: ')
+        Called buffer.append('')
+        Called buffer.append('')
+        Called buffer.append(
+        '==============================================================================')
+        Called buffer.append('')
+        """
+        if comment is None:
+            comment = { 'status': 'new', 'author': self.blog_username,
+                        'comment_id': '', 'parent': '0',
+                        'date_created_gmt': '', 'type': '', 'content': ''
+                      }
+
+        for header in ( 'status', 'author', 'comment_id', 'parent',
+                    'date_created_gmt', 'type'  ):
+            vim.current.buffer.append('%s: %s' % ( header, comment[header] ))
+        vim.current.buffer.append('')
+        for line in comment['content'].split('\n'):
+            vim.current.buffer.append(line.encode('utf-8'))
+        vim.current.buffer.append('=' * 78)
+        vim.current.buffer.append('')
 
     def getMeta(self):
         """

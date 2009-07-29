@@ -301,7 +301,6 @@ class BlogIt:
                    'Status': display_comment_count
                  }
         vim.current.buffer[:] = None
-        vim.command("setlocal ft=mail completefunc=BlogitCompleteCategories")
         if new_text is not None:
             post['description'] = new_text
             do_unformat = False
@@ -309,11 +308,11 @@ class BlogIt:
                 [ 'From', 'Post-Id', 'Subject', 'Status', 'Categories', 
                     'Tags', 'Date' 
                 ], self.meta_data_dict, meta_data_f_dict, do_unformat)
-        vim.current.window.cursor = (8, 0)
-        vim.command('set nomodified')
-        vim.command('set textwidth=0')
         self.current_post = post
         vim.command('nnoremap <buffer> gf :py blogit.list_comments()<cr>')
+        vim.command('setlocal nomodified ft=mail textwidth=0 ' +
+                             'completefunc=BlogitCompleteCategories')
+        vim.current.window.cursor = (8, 0)
 
     @staticmethod
     def str_to_DateTime(text='', format='%c'):

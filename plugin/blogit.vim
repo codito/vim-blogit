@@ -241,6 +241,42 @@ class BlogIt:
             'Status': 'blogit_status',
            }
 
+    def append_post(self, post_data, post_body, headers,
+            meta_data_dict, meta_data_f_dict={}, unformat=False):
+        """
+        Append a post or comment to the vim buffer.
+        """
+        is_first_post_in_buffer = False
+        if vim.current.buffer[:] == ['']:
+            # work around empty buffer has one line.
+            is_first_post_in_buffer = True
+        for label in headers:
+            try:
+                val = post_data[meta_data_dict[label]]
+            except KeyError:
+                val = ''
+            if label in meta_data_f_dict:
+                val = meta_data_f_dict[label](val)
+            vim.current.buffer.append('%s: %s' % ( label,
+                    unicode(val).encode('utf-8') ))
+        if is_first_post_in_buffer:
+            # work around empty buffer has one line.
+            vim.current.buffer[0] = None
+        vim.current.buffer.append('')
+        content = post_data.get(post_body, '').encode("utf-8")
+        if unformat:
+            content = self.unformat(content)
+        for line in content.split('\n'):
+            vim.current.buffer.append(line)
+
+        if post_data.get('mt_text_more'):
+            vim.current.buffer.append('')
+            vim.current.buffer.append('<!--more-->')
+            vim.current.buffer.append('')
+            content = self.unformat(post_data["mt_text_more"].encode("utf-8"))
+            for line in content.split('\n'):
+                vim.current.buffer.append(line)
+
     def display_post(self, post={}, new_text=None):
         def display_comment_count(d):
             if d == '':
@@ -255,6 +291,7 @@ class BlogIt:
                 s = u' (%s)' % ', '.join(comment_typ_count)
             return ( u'%(post_status)s \u2013 %(total_comments)s Comments' + s ) % d
 
+        do_unformat = True
         default_post = { 'post_status': 'draft',
                          self.meta_data_dict['From']: self.blog_username }
         default_post.update(post)
@@ -265,34 +302,13 @@ class BlogIt:
                  }
         vim.current.buffer[:] = None
         vim.command("setlocal ft=mail completefunc=BlogitCompleteCategories")
-        for label in [ 'From', 'Post-Id', 'Subject', 'Status', 'Categories',
-                'Tags', 'Date' ]:
-            try:
-                val = post[self.meta_data_dict[label]]
-            except KeyError:
-                val = ''
-            if label in meta_data_f_dict:
-                val = meta_data_f_dict[label](val)
-            vim.current.buffer.append('%s: %s' % ( label,
-                    unicode(val).encode('utf-8') ))
-        vim.current.buffer[0] = None
-        vim.current.buffer.append('')
-        if new_text is None:
-            content = self.unformat(post.get('description', '')\
-                        .encode("utf-8")).split('\n')
-        else:
-            content = new_text
-        for line in content:
-            vim.current.buffer.append(line)
-
-        if post.get('mt_text_more'):
-            vim.current.buffer.append('')
-            vim.current.buffer.append('<!--more-->')
-            vim.current.buffer.append('')
-            content = self.unformat(post["mt_text_more"].encode("utf-8"))
-            for line in content.split('\n'):
-                vim.current.buffer.append(line)
-
+        if new_text is not None:
+            post['description'] = new_text
+            do_unformat = False
+        self.append_post(post, 'description', 
+                [ 'From', 'Post-Id', 'Subject', 'Status', 'Categories', 
+                    'Tags', 'Date' 
+                ], self.meta_data_dict, meta_data_f_dict, do_unformat)
         vim.current.window.cursor = (8, 0)
         vim.command('set nomodified')
         vim.command('set textwidth=0')
@@ -383,7 +399,7 @@ class BlogIt:
             'http://example.com',
             {'post_id': 42, 'number': 1000, 'offset': 0})
         Called append_comment_to_buffer()
-        Called vim.command('set nomodifiable nomodified')
+        Called vim.command('setlocal nomodifiable nomodified linebreak')
         """
         # TODO
         vim.command('enew')
@@ -393,42 +409,44 @@ class BlogIt:
                                        'number': 1000}):
             self.append_comment_to_buffer(comment)
         self.append_comment_to_buffer()
-        vim.command('set nomodifiable nomodified')
+        vim.command('setlocal nomodifiable nomodified linebreak')
 
     def append_comment_to_buffer(self, comment=None):
         """
         Formats and appends a given comment to the current buffer. Appends
         an comment template if None is given.
 
-        >>> vim.current.buffer = Mock('buffer')
+        >>> vim.current.buffer = ['']
         >>> blogit.blog_username = 'User Name'
-        >>> blogit.append_comment_to_buffer()   #doctest: +NORMALIZE_WHITESPACE
-        Called buffer.append('status: new')
-        Called buffer.append('author: User Name')
-        Called buffer.append('comment_id: ')
-        Called buffer.append('parent: 0')
-        Called buffer.append('date_created_gmt: ')
-        Called buffer.append('type: ')
-        Called buffer.append('')
-        Called buffer.append('')
-        Called buffer.append(
-        '==============================================================================')
-        Called buffer.append('')
+        >>> blogit.append_comment_to_buffer()
+        >>> vim.current.buffer   #doctest: +NORMALIZE_WHITESPACE
+        [None, 
+        'Status: new', 
+        'Author: User Name', 
+        'ID: ', 
+        'Parent: 0', 
+        'Date: ', 
+        'Type: ', 
+        '', 
+        '', 
+        '', 
+        '==============================================================================']
         """
+        meta_data_dict = { 'Status': 'status', 'Author': 'author', 
+                           'ID': 'comment_id', 'Parent': 'parent', 
+                           'Date': 'date_created_gmt', 'Type': 'type' 
+                         }
+        meta_data_f_dict = { 'Date': self.DateTime_to_str }
         if comment is None:
             comment = { 'status': 'new', 'author': self.blog_username,
                         'comment_id': '', 'parent': '0',
                         'date_created_gmt': '', 'type': '', 'content': ''
                       }
-
-        for header in ( 'status', 'author', 'comment_id', 'parent',
-                    'date_created_gmt', 'type'  ):
-            vim.current.buffer.append('%s: %s' % ( header, comment[header] ))
+        self.append_post(comment, 'content', [ 'Status', 'Author', 
+                'ID', 'Parent', 'Date', 'Type' ], 
+                meta_data_dict, meta_data_f_dict)
         vim.current.buffer.append('')
-        for line in comment['content'].split('\n'):
-            vim.current.buffer.append(line.encode('utf-8'))
         vim.current.buffer.append('=' * 78)
-        vim.current.buffer.append('')
 
     def getMeta(self):
         """

@@ -388,6 +388,8 @@ class BlogIt:
 
     def getComments(self, id, offset=0):
         """
+        Lists the comments to a post with given id in a new buffer.
+
         >>> vim.command = Mock('vim.command')
         >>> blogit.blog_username = 'User Name'
         >>> blogit.append_comment_to_buffer = Mock('append_comment_to_buffer')
@@ -461,6 +463,8 @@ class BlogIt:
 
     def getMeta(self):
         """
+        Reads the meta-data in the current buffer. Outputed as dictionary.
+
         >>> vim.current.buffer = [ 'tag: value', '', 'body: novalue' ]
         >>> list(blogit.getMeta())
         [('tag', 'value')]
@@ -473,8 +477,11 @@ class BlogIt:
             if m:
                 yield m.group(1, 2)
 
-    def getText(self, start_text):
+    def getText(self, start_line):
         r"""
+        Read the blog text from vim buffer. start_line is the first
+        line which is part of the test (not headers). Text is then formated
+        as defined by vim variable blogit_format.
 
         Can raise FilterException.
 
@@ -504,7 +511,7 @@ class BlogIt:
             ...
         FilterException
         """
-        text = '\n'.join(vim.current.buffer[start_text:])
+        text = '\n'.join(vim.current.buffer[start_line:])
         return map(self.format, text.split('\n<!--more-->\n\n'))
 
     def unformat(self, text):

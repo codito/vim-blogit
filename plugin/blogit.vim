@@ -285,7 +285,7 @@ class BlogIt:
         def display_comment_count(d):
             if d == '':
                 return u'new'
-            comment_typ_count = [ '%s %s' % (key, text)
+            comment_typ_count = [ '%s %s' % (d[key], text)
                     for key, text in ( ( 'awaiting_moderation', 'awaiting' ),
                             ( 'spam', 'spam' ) )
                     if d[key] > 0 ]

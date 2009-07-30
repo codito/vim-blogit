@@ -124,7 +124,7 @@ function BlogitCompleteCategories(findstart, base)
     endif
 endfunction
 
-function CommentsFoldText() 
+function CommentsFoldText()
     return v:folddashes . getline(v:foldstart + 8)
 endfunction
 
@@ -308,9 +308,9 @@ class BlogIt:
         if new_text is not None:
             post['description'] = new_text
             do_unformat = False
-        self.append_post(post, 'description', 
-                [ 'From', 'Post-Id', 'Subject', 'Status', 'Categories', 
-                    'Tags', 'Date' 
+        self.append_post(post, 'description',
+                [ 'From', 'Post-Id', 'Subject', 'Status', 'Categories',
+                    'Tags', 'Date'
                 ], self.meta_data_dict, meta_data_f_dict, do_unformat)
         self.current_post = post
         vim.command('nnoremap <buffer> gf :py blogit.list_comments()<cr>')
@@ -408,8 +408,8 @@ class BlogIt:
         # TODO
         vim.command('enew')
         fold_levels = {}
-        for comment in reversed(self.client.wp.getComments('', 
-                self.blog_username, blogit.blog_password, 
+        for comment in reversed(self.client.wp.getComments('',
+                self.blog_username, blogit.blog_password,
                 { 'post_id': id, 'offset': offset, 'number': 1000 })):
             try:
                 fold = fold_levels[comment['parent']] + 1
@@ -431,20 +431,20 @@ class BlogIt:
         >>> blogit.append_comment_to_buffer()
         >>> vim.current.buffer   #doctest: +NORMALIZE_WHITESPACE
         ['======================================================================== {{{1',
-        'Status: new', 
-        'Author: User Name', 
-        'ID: ', 
-        'Parent: 0', 
-        'Date: ', 
-        'Type: ', 
-        '', 
-        '', 
-        '', 
-        ''] 
+        'Status: new',
+        'Author: User Name',
+        'ID: ',
+        'Parent: 0',
+        'Date: ',
+        'Type: ',
+        '',
+        '',
+        '',
+        '']
         """
-        meta_data_dict = { 'Status': 'status', 'Author': 'author', 
-                           'ID': 'comment_id', 'Parent': 'parent', 
-                           'Date': 'date_created_gmt', 'Type': 'type' 
+        meta_data_dict = { 'Status': 'status', 'Author': 'author',
+                           'ID': 'comment_id', 'Parent': 'parent',
+                           'Date': 'date_created_gmt', 'Type': 'type'
                          }
         meta_data_f_dict = { 'Date': self.DateTime_to_str }
         if comment is None:
@@ -453,8 +453,8 @@ class BlogIt:
                         'date_created_gmt': '', 'type': '', 'content': ''
                       }
         vim.current.buffer[-1] = 72 * '=' + ' {{{%s' % fold_level
-        self.append_post(comment, 'content', [ 'Status', 'Author', 
-                'ID', 'Parent', 'Date', 'Type' ], 
+        self.append_post(comment, 'content', [ 'Status', 'Author',
+                'ID', 'Parent', 'Date', 'Type' ],
                 meta_data_dict, meta_data_f_dict)
         vim.current.buffer.append('')
         vim.current.buffer.append('')

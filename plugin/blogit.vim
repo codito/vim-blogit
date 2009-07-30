@@ -124,6 +124,10 @@ function BlogitCompleteCategories(findstart, base)
     endif
 endfunction
 
+function CommentsFoldText() 
+    return v:folddashes . getline(v:foldstart + 8)
+endfunction
+
 python <<EOF
 # -*- coding: utf-8 -*-
 # Lets the python unit test ignore eveything above this line (docstring). """
@@ -398,18 +402,26 @@ class BlogIt:
             'http://example.com',
             {'post_id': 42, 'number': 1000, 'offset': 0})
         Called append_comment_to_buffer()
-        Called vim.command('setlocal nomodifiable nomodified linebreak')
+        Called vim.command(
+            'setlocal nomodifiable nomodified linebreak foldmethod=marker foldtext=CommentsFoldText()')
         """
         # TODO
         vim.command('enew')
+        fold_levels = {}
         for comment in reversed(self.client.wp.getComments('', 
                 self.blog_username, blogit.blog_password, 
                 { 'post_id': id, 'offset': offset, 'number': 1000 })):
-            self.append_comment_to_buffer(comment)
+            try:
+                fold = fold_levels[comment['parent']] + 1
+            except KeyError:
+                fold = 1
+            fold_levels[comment['post_id']] = fold
+            self.append_comment_to_buffer(comment, fold)
         self.append_comment_to_buffer()
-        vim.command('setlocal nomodifiable nomodified linebreak')
+        vim.command('setlocal nomodifiable nomodified linebreak ' +
+            'foldmethod=marker foldtext=CommentsFoldText()')
 
-    def append_comment_to_buffer(self, comment=None):
+    def append_comment_to_buffer(self, comment=None, fold_level=1):
         """
         Formats and appends a given comment to the current buffer. Appends
         an comment template if None is given.
@@ -418,7 +430,7 @@ class BlogIt:
         >>> blogit.blog_username = 'User Name'
         >>> blogit.append_comment_to_buffer()
         >>> vim.current.buffer   #doctest: +NORMALIZE_WHITESPACE
-        [None, 
+        ['======================================================================== {{{1',
         'Status: new', 
         'Author: User Name', 
         'ID: ', 
@@ -428,7 +440,7 @@ class BlogIt:
         '', 
         '', 
         '', 
-        '==============================================================================']
+        ''] 
         """
         meta_data_dict = { 'Status': 'status', 'Author': 'author', 
                            'ID': 'comment_id', 'Parent': 'parent', 
@@ -440,11 +452,12 @@ class BlogIt:
                         'comment_id': '', 'parent': '0',
                         'date_created_gmt': '', 'type': '', 'content': ''
                       }
+        vim.current.buffer[-1] = 72 * '=' + ' {{{%s' % fold_level
         self.append_post(comment, 'content', [ 'Status', 'Author', 
                 'ID', 'Parent', 'Date', 'Type' ], 
                 meta_data_dict, meta_data_f_dict)
         vim.current.buffer.append('')
-        vim.current.buffer.append('=' * 78)
+        vim.current.buffer.append('')
 
     def getMeta(self):
         """

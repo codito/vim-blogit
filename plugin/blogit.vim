@@ -690,10 +690,10 @@ class BlogIt:
         r"""
         >>> class C:
         ...     def command_f(self):
-        ...         ''' A method. '''
+        ...         ' A method. '
         ...         print "f should not be executed."
         ...     def command_g(self, one, two):
-        ...         ''' A method with options. '''
+        ...         ' A method with options. '
         ...         print "g should not be executed."
         ...
         >>> L = []

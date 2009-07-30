@@ -150,7 +150,6 @@ from calendar import timegm
 from subprocess import Popen, CalledProcessError, PIPE
 from xmlrpclib import DateTime, Fault, MultiCall
 from inspect import getargspec
-from types import MethodType
 
 #####################
 # Do not edit below #

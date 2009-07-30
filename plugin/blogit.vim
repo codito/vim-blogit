@@ -125,7 +125,11 @@ function BlogitCompleteCategories(findstart, base)
 endfunction
 
 function CommentsFoldText()
-    return v:folddashes . getline(v:foldstart + 8)
+    let line_no = v:foldstart
+    while getline(line_no) !~ '^\s*$'
+        let line_no += 1
+    endwhile
+    return v:folddashes . getline(line_no + 1)
 endfunction
 
 python <<EOF

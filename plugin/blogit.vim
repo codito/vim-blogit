@@ -96,7 +96,7 @@ command! -nargs=* Blogit exec('py blogit.command(<f-args>)')
 let s:used_categories = []
 let s:used_tags = []
 
-function BlogitCompleteCategories(findstart, base)
+function BlogitComplete(findstart, base)
     " based on code from :he complete-functions
     if a:findstart
         " locate the start of the word
@@ -107,10 +107,13 @@ function BlogitCompleteCategories(findstart, base)
         endwhile
         return start
     else
-        if getline('.') =~? '^Categories: '
+        if getline('.') =~# '^Categories: '
             let L = s:used_categories
-        elseif getline('.') =~? '^Tags: '
+        elseif getline('.') =~# '^Tags: '
             let L = s:used_tags
+        elseif getline('.') =~# '^Status: '
+            " for comments
+            let L = [ 'approve', 'spam', 'hold', 'new', 'rm' ]
         else
             return []
         endif
@@ -320,7 +323,7 @@ class BlogIt:
         self.current_post = post
         vim.command('nnoremap <buffer> gf :py blogit.list_comments()<cr>')
         vim.command('setlocal nomodified ft=mail textwidth=0 ' +
-                             'completefunc=BlogitCompleteCategories')
+                             'completefunc=BlogitComplete')
         vim.current.window.cursor = (8, 0)
 
     @staticmethod
@@ -411,7 +414,8 @@ class BlogIt:
         Called append_comment_to_buffer()
         Called vim.command(
             'setlocal nomodifiable nomodified linebreak
-                      foldmethod=marker foldtext=CommentsFoldText()')
+                      foldmethod=marker foldtext=CommentsFoldText()
+                      completefunc=BlogitComplete')
         """
         # TODO
         vim.command('enew')
@@ -440,7 +444,8 @@ class BlogIt:
                 fold_levels[comment['post_id']] = fold
                 self.append_comment_to_buffer(comment, fold)
         vim.command('setlocal nomodifiable nomodified linebreak ' +
-            'foldmethod=marker foldtext=CommentsFoldText()')
+            'foldmethod=marker foldtext=CommentsFoldText() ' +
+            'completefunc=BlogitComplete')
 
     def append_comment_to_buffer(self, comment=None, fold_level=1):
         """

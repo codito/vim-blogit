@@ -192,28 +192,40 @@ class BlogIt:
         >>> sys.stderr = Mock('stderr')
         >>> blogit.command('non-existant')
         Called vim.eval('blogit_url')
-        Called stderr.write('No such command: non-existant')
+        Called stderr.write('No such command: non-existant.')
 
         >>> def f(x): print 'got %s' % x
         >>> blogit.command_mocktest = f
-        >>> blogit.command('mocktest')
-        Called stderr.write('Command mocktest takes 0 arguments')
+        >>> blogit.command('mo')
+        Called stderr.write('Command mo takes 0 arguments.')
 
-        >>> blogit.command('mocktest', 2)
+        >>> blogit.command('mo', 2)
         got 2
+
+        >>> blogit.command_mockambiguous = f
+        >>> blogit.command('mo')
+        Called stderr.write('Ambiguious command mo: mockambiguous, mocktest.')
         """
         if self.client is None:
             self.connect()
-        try:
-            getattr(self, 'command_' + command)(*args)
-        except AttributeError:
-            sys.stderr.write("No such command: %s" % command)
-        except TypeError, e:
+        def f(x): return x.startswith('command_' + command)
+        matching_commands = filter(f, dir(self))
+
+        if len(matching_commands) == 0:
+            sys.stderr.write("No such command: %s." % command)
+        elif len(matching_commands) == 1:
             try:
-                sys.stderr.write("Command %s takes %s arguments" % \
-                        (command, int(str(e).split(' ')[3]) - 1))
-            except:
-                sys.stderr.write('%s' % e)
+                getattr(self, matching_commands[0])(*args)
+            except TypeError, e:
+                try:
+                    sys.stderr.write("Command %s takes %s arguments." % \
+                            (command, int(str(e).split(' ')[3]) - 1))
+                except:
+                    sys.stderr.write('%s' % e)
+        else:
+            sys.stderr.write("Ambiguious command %s: %s." % ( command,
+                    ', '.join([ s.replace('command_', '', 1)
+                        for s in matching_commands ]) ))
 
     def list_comments(self):
         if vim.current.line.startswith('Status: '):

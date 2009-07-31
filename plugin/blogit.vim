@@ -107,6 +107,7 @@ function BlogitComplete(findstart, base)
         endwhile
         return start
     else
+        let sep = ', '
         if getline('.') =~# '^Categories: '
             let L = s:used_categories
         elseif getline('.') =~# '^Tags: '
@@ -114,13 +115,14 @@ function BlogitComplete(findstart, base)
         elseif getline('.') =~# '^Status: '
             " for comments
             let L = [ 'approve', 'spam', 'hold', 'new', 'rm' ]
+            let sep = ''
         else
             return []
         endif
 	    let res = []
 	    for m in L
 	        if m =~ '^' . a:base
-		        call add(res, m . ', ')
+		        call add(res, m . sep)
 	        endif
 	    endfor
 	    return res
@@ -170,21 +172,40 @@ class BlogIt:
 
     def __init__(self):
         self.client = None
-        self.post = {}
+        self._posts = {}
+        self._comments = {}
 
     def connect(self):
         self.client = xmlrpclib.ServerProxy(self.blog_url)
 
-    def get_current_post(self):
-        try:
-            return self.post[vim.current.buffer.number]
-        except KeyError:
-            return None
+    def buffer_property(var_name):
 
-    def set_current_post(self, value):
-        self.post[vim.current.buffer.number] = value
+        def get_current_post(self):
+            try:
+                return getattr(self, var_name)[vim.current.buffer.number]
+            except KeyError:
+                return None
 
-    current_post = property(get_current_post, set_current_post)
+        def set_current_post(self, value):
+            getattr(self, var_name)[vim.current.buffer.number] = value
+
+        return property(get_current_post, set_current_post)
+
+    current_post = buffer_property('_posts')
+    current_comments = buffer_property('_comments')
+
+    meta_data_dict = { 'From': 'wp_author_display_name', 'Post-Id': 'postid',
+            'Subject': 'title', 'Categories': 'categories',
+            'Tags': 'mt_keywords', 'Date': 'date_created_gmt',
+            'Status': 'blogit_status',
+           }
+
+    comments_meta_data_dict = { 'Status': 'status', 'Author': 'author',
+            'ID': 'comment_id', 'Parent': 'parent',
+            'Date': 'date_created_gmt', 'Type': 'type', 'content': 'content',
+           }
+
+    vimcommand_help = []
 
     def command(self, command='help', *args):
         """
@@ -258,12 +279,6 @@ class BlogIt:
             # To access vim s:variables we can't call this directly
             # via command_edit
             vim.command('Blogit edit %s' % id)
-
-    meta_data_dict = { 'From': 'wp_author_display_name', 'Post-Id': 'postid',
-            'Subject': 'title', 'Categories': 'categories',
-            'Tags': 'mt_keywords', 'Date': 'date_created_gmt',
-            'Status': 'blogit_status',
-           }
 
     def append_post(self, post_data, post_body, headers,
             meta_data_dict, meta_data_f_dict={}, unformat=False):
@@ -408,8 +423,7 @@ class BlogIt:
         return d
 
     def getComments(self, id, offset=0):
-        """
-        Lists the comments to a post with given id in a new buffer.
+        """ Lists the comments to a post with given id in a new buffer.
 
         >>> blogit.client = Mock('client')
         >>> xmlrpclib.MultiCall = Mock('xmlrpclib.MultiCall', returns=Mock(
@@ -417,7 +431,8 @@ class BlogIt:
         >>> vim.command = Mock('vim.command')
         >>> blogit.blog_username = 'User Name'
         >>> blogit.append_comment_to_buffer = Mock('append_comment_to_buffer')
-        >>> blogit.getComments(42)    #doctest: +ELLIPSIS, +NORMALIZE_WHITESPACE
+        >>> blogit.changed_comments = Mock('changed_comments', returns=[])
+        >>> blogit.getComments(42)   #doctest: +ELLIPSIS +NORMALIZE_WHITESPACE
         Called vim.command('enew')
         Called xmlrpclib.MultiCall(<Mock 0x... client>)
         Called vim.eval('blogit_password')
@@ -425,12 +440,13 @@ class BlogIt:
         Called vim.eval('blogit_password')
         Called append_comment_to_buffer()
         Called vim.command(
-            'setlocal nomodifiable nomodified linebreak
+            'setlocal nomodified linebreak
                       foldmethod=marker foldtext=CommentsFoldText()
                       completefunc=BlogitComplete')
+        Called changed_comments()
         """
-        # TODO
         vim.command('enew')
+        self.current_comments = { 'blog_id': id }
         multicall = xmlrpclib.MultiCall(self.client)
         for comment_typ in ( 'hold', 'spam', 'approve' ):
             multicall.wp.getComments('',
@@ -455,9 +471,91 @@ class BlogIt:
                     fold = 2
                 fold_levels[comment['post_id']] = fold
                 self.append_comment_to_buffer(comment, fold)
-        vim.command('setlocal nomodifiable nomodified linebreak ' +
+        vim.command('setlocal nomodified linebreak ' +
             'foldmethod=marker foldtext=CommentsFoldText() ' +
             'completefunc=BlogitComplete')
+        if type(self.current_comments['blog_id']) == dict:
+            # no comment should have id 'blog_id'.
+            sys.stderr.write('A comment used reserved id "blog_id"')
+        elif list(self.changed_comments()) != []:
+            sys.stderr.write('Bug in BlogIt: Deactivating comment editing.')
+            print list(self.changed_comments())
+            for d in self.changed_comments():
+                sys.stderr.write('\n%s' % d['comment_id'])
+        else:
+            return
+        vim.command('setlocal nomodifiable')
+        del self.current_comments['blog_id']
+
+    def changed_comments(self):
+        """ Yields comments with changes made to in the vim buffer.
+
+        >>> blogit.current_comments = { '': { 'status': 'new'},
+        ...     '1': { 'content': 'Old Text', 'status': 'hold',
+        ...             'unknown': 'tag'},
+        ...     '2': { 'content': 'Same Text', 'status': 'hold'},
+        ...     '3': { 'content': 'Same Again', 'status': 'hold'} }
+        >>> vim.current.buffer = [
+        ...     60 * '=', 'ID:  1 ', 'Status: hold', '', 'Changed Text',
+        ...     60 * '=', 'ID:  ', 'Status: hold', '', 'New Text',
+        ...     60 * '=', 'ID:  2', 'Status: hold', '', 'Same Text',
+        ...     60 * '=', 'ID:  3', 'Status: spam', '', 'Same Again',
+        ... ]
+        >>> list(blogit.changed_comments())
+        [{'content': u'Changed Text', 'status': u'hold', 'unknown': 'tag'}, {'status': u'hold', 'content': u'New Text'}, {'content': u'Same Again', 'status': u'spam'}]
+        """
+
+        for comment in self.read_comments():
+            original_comment = self.current_comments[comment['ID']]
+            updated_comment = original_comment.copy()
+            for t in ( 'content', 'Status' ):
+                updated_comment[self.comments_meta_data_dict[t]] = \
+                        comment[t].decode('utf-8')
+            if original_comment != updated_comment:
+                yield updated_comment
+
+    def read_comments(self):
+        r""" Yields a dict for each comment in the current buffer.
+
+        >>> vim.current.buffer = [
+        ...     60 * '=', 'section header',
+        ...     60 * '=', 'Tag2: Val2 ',
+        ...     60 * '=',
+        ...     'Tag:  Value  ', '', 'Some Text', 'in two lines.', '', '',
+        ... ]
+        >>> list(blogit.read_comments())
+        [{'content': 'Some Text\nin two lines.', 'Tag': 'Value'}]
+        """
+
+        def process_comment(headers, body):
+            for i, line in reversed(list(enumerate(body))):
+                if line.strip() != '':
+                    body = body[:i+1]
+                    break
+            else:    # body is whitespace
+                return None
+            d = { 'content': '\n'.join(body) }
+            for t, v in self.getMeta(headers):
+                d[t.strip()] = v.strip()
+            return d
+
+        headers = []
+        body = []
+        current_section = headers
+        for line in vim.current.buffer:
+            if line.startswith(60 * '='):
+                c = process_comment(headers, body)
+                headers, body = [], []
+                current_section = headers
+                if c is not None:
+                    yield c
+            if current_section == headers and line.strip() == '':
+                current_section = body
+                continue
+            current_section.append(line)
+        c = process_comment(headers, body)
+        if c is not None:
+            yield c
 
     def append_comment_to_buffer(self, comment=None, fold_level=1):
         """
@@ -465,6 +563,7 @@ class BlogIt:
         an comment template if None is given.
 
         >>> vim.current.buffer = ['']
+        >>> blogit.current_comments = { 'blog_id': 0 }
         >>> blogit.blog_username = 'User Name'
         >>> blogit.append_comment_to_buffer()
         >>> vim.current.buffer   #doctest: +NORMALIZE_WHITESPACE
@@ -480,10 +579,6 @@ class BlogIt:
         '',
         '']
         """
-        meta_data_dict = { 'Status': 'status', 'Author': 'author',
-                           'ID': 'comment_id', 'Parent': 'parent',
-                           'Date': 'date_created_gmt', 'Type': 'type'
-                         }
         meta_data_f_dict = { 'Date': self.DateTime_to_str }
         if comment is None:
             comment = { 'status': 'new', 'author': self.blog_username,
@@ -493,20 +588,22 @@ class BlogIt:
         vim.current.buffer[-1] = 72 * '=' + ' {{{%s' % fold_level
         self.append_post(comment, 'content', [ 'Status', 'Author',
                 'ID', 'Parent', 'Date', 'Type' ],
-                meta_data_dict, meta_data_f_dict)
+                self.comments_meta_data_dict, meta_data_f_dict)
         vim.current.buffer.append('')
         vim.current.buffer.append('')
+        self.current_comments[str(comment['comment_id'])] = comment
 
-    def getMeta(self):
+    def getMeta(self, text=None):
         """
         Reads the meta-data in the current buffer. Outputed as dictionary.
 
-        >>> vim.current.buffer = [ 'tag: value', '', 'body: novalue' ]
-        >>> list(blogit.getMeta())
+        >>> list(blogit.getMeta([ 'tag: value', '', 'body: novalue' ]))
         [('tag', 'value')]
         """
+        if text is None:
+            text = vim.current.buffer
         r = re.compile('^(.*?): (.*)$')
-        for line in vim.current.buffer:
+        for line in text:
             if line.rstrip() == '':
                 return
             m = r.match(line)
@@ -716,8 +813,6 @@ class BlogIt:
             return vim.eval('blog_name')
         else:
             return 'blogit'
-
-    vimcommand_help = []
 
     def vimcommand(f, register_to=vimcommand_help):
         r"""

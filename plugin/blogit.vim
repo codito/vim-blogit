@@ -126,10 +126,12 @@ endfunction
 
 function CommentsFoldText()
     let line_no = v:foldstart
-    while getline(line_no) !~ '^\s*$'
-        let line_no += 1
-    endwhile
-    return v:folddashes . getline(line_no + 1)
+    if v:foldlevel > 1
+        while getline(line_no) !~ '^\s*$'
+            let line_no += 1
+        endwhile
+    endif
+    return '+' . v:folddashes . getline(line_no + 1)
 endfunction
 
 python <<EOF
@@ -360,6 +362,7 @@ class BlogIt:
     def getPost(self, id):
         """
         >>> blogit.blog_username, blogit.blog_password = 'user', 'password'
+        >>> blogit.client = Mock('client')
         >>> xmlrpclib.MultiCall = Mock('xmlrpclib.MultiCall', returns=Mock(
         ...         'multicall', returns=[{'post_status': 'draft'}, {}]))
         >>> d = blogit.getPost(42)    #doctest: +ELLIPSIS
@@ -393,36 +396,49 @@ class BlogIt:
         """
         Lists the comments to a post with given id in a new buffer.
 
+        >>> blogit.client = Mock('client')
+        >>> xmlrpclib.MultiCall = Mock('xmlrpclib.MultiCall', returns=Mock(
+        ...         'multicall', returns=[], tracker=None))
         >>> vim.command = Mock('vim.command')
         >>> blogit.blog_username = 'User Name'
         >>> blogit.append_comment_to_buffer = Mock('append_comment_to_buffer')
-        >>> blogit.client = Mock('client')
-        >>> blogit.client.wp.getComments = Mock('getComments', returns=[])
-        >>> blogit.getComments(42)
+        >>> blogit.getComments(42)    #doctest: +ELLIPSIS, +NORMALIZE_WHITESPACE
         Called vim.command('enew')
+        Called xmlrpclib.MultiCall(<Mock 0x... client>)
         Called vim.eval('blogit_password')
-        Called getComments(
-            '',
-            'User Name',
-            'http://example.com',
-            {'post_id': 42, 'number': 1000, 'offset': 0})
+        Called vim.eval('blogit_password')
+        Called vim.eval('blogit_password')
         Called append_comment_to_buffer()
         Called vim.command(
-            'setlocal nomodifiable nomodified linebreak foldmethod=marker foldtext=CommentsFoldText()')
+            'setlocal nomodifiable nomodified linebreak
+                      foldmethod=marker foldtext=CommentsFoldText()')
         """
         # TODO
         vim.command('enew')
-        fold_levels = {}
-        for comment in reversed(self.client.wp.getComments('',
-                self.blog_username, blogit.blog_password,
-                { 'post_id': id, 'offset': offset, 'number': 1000 })):
-            try:
-                fold = fold_levels[comment['parent']] + 1
-            except KeyError:
-                fold = 1
-            fold_levels[comment['post_id']] = fold
-            self.append_comment_to_buffer(comment, fold)
+        multicall = xmlrpclib.MultiCall(self.client)
+        for comment_typ in ( 'hold', 'spam', 'approve' ):
+            multicall.wp.getComments('',
+                    self.blog_username, blogit.blog_password,
+                    { 'post_id': id, 'status': comment_typ,
+                      'offset': offset, 'number': 1000 })
         self.append_comment_to_buffer()
+        for comments, heading in zip(multicall(),
+                ( 'In Moderadation', 'Spam', 'Published' )):
+            if comments == []:
+                continue
+
+            vim.current.buffer[-1] = 72 * '=' + ' {{{1'
+            vim.current.buffer.append(5 * ' ' + heading)
+            vim.current.buffer.append('')
+
+            fold_levels = {}
+            for comment in reversed(comments):
+                try:
+                    fold = fold_levels[comment['parent']] + 2
+                except KeyError:
+                    fold = 2
+                fold_levels[comment['post_id']] = fold
+                self.append_comment_to_buffer(comment, fold)
         vim.command('setlocal nomodifiable nomodified linebreak ' +
             'foldmethod=marker foldtext=CommentsFoldText()')
 

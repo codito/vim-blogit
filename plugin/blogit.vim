@@ -142,15 +142,6 @@ endfunction
 python <<EOF
 # -*- coding: utf-8 -*-
 # Lets the python unit test ignore eveything above this line (docstring). """
-try:
-    import vim
-except ImportError:
-    # Used outside of vim (for testing)
-    from minimock import Mock, mock
-    import doctest, minimock
-    vim = Mock('vim')
-else:
-    doctest = False
 import xmlrpclib, sys, re
 from time import mktime, strptime, strftime, localtime, gmtime
 from calendar import timegm
@@ -158,11 +149,24 @@ from subprocess import Popen, CalledProcessError, PIPE
 from xmlrpclib import DateTime, Fault, MultiCall
 from inspect import getargspec
 
+try:
+    import vim
+except ImportError:
+    # Used outside of vim (for testing)
+    from minimock import Mock, mock
+    import doctest, minimock
+    vim = Mock('vim', tracker=None)
+
+    class Mock_Buffer(list):
+        number = 3
+else:
+    doctest = False
+
 #####################
 # Do not edit below #
 #####################
 
-class BlogIt:
+class BlogIt(object):
     class FilterException(Exception):
         def __init__(self, message, input_text, filter):
             self.message = "Blogit: Error happend while filtering with:" + \
@@ -172,27 +176,32 @@ class BlogIt:
 
     def __init__(self):
         self.client = None
-        self._posts = {}
-        self._comments = {}
+        self.__posts = {}
+        self.__comments = {}
 
     def connect(self):
         self.client = xmlrpclib.ServerProxy(self.blog_url)
 
-    def buffer_property(var_name):
+    def __get_current_post(self):
+        try:
+            return self.__posts[vim.current.buffer.number]
+        except KeyError:
+            return None
 
-        def get_current_post(self):
-            try:
-                return getattr(self, var_name)[vim.current.buffer.number]
-            except KeyError:
-                return None
+    def __set_current_post(self, value):
+        self.__posts[vim.current.buffer.number] = value
 
-        def set_current_post(self, value):
-            getattr(self, var_name)[vim.current.buffer.number] = value
+    def __get_current_comments(self):
+        try:
+            return self.__comments[vim.current.buffer.number]
+        except KeyError:
+            return None
 
-        return property(get_current_post, set_current_post)
+    def __set_current_comments(self, value):
+        self.__comments[vim.current.buffer.number] = value
 
-    current_post = buffer_property('_posts')
-    current_comments = buffer_property('_comments')
+    current_post = property(__get_current_post, __set_current_post)
+    current_comments = property(__get_current_comments, __set_current_comments)
 
     meta_data_dict = { 'From': 'wp_author_display_name', 'Post-Id': 'postid',
             'Subject': 'title', 'Categories': 'categories',
@@ -212,7 +221,6 @@ class BlogIt:
         >>> xmlrpclib = Mock('xmlrpclib')
         >>> sys.stderr = Mock('stderr')
         >>> blogit.command('non-existant')
-        Called vim.eval('blogit_url')
         Called stderr.write('No such command: non-existant.')
 
         >>> def f(x): print 'got %s' % x
@@ -256,12 +264,12 @@ class BlogIt:
         """
         >>> vim.command = Mock('vim.command')
         >>> vim.current.window.cursor = (1, 2)
-        >>> vim.current.buffer = [ '12 random text' ]
+        >>> vim.current.buffer = Mock_Buffer([ '12 random text' ])
         >>> blogit.list_edit()
         Called vim.command('bdelete')
         Called vim.command('Blogit edit 12')
 
-        >>> vim.current.buffer = [ 'no blog id 12' ]
+        >>> vim.current.buffer = Mock_Buffer([ 'no blog id 12' ])
         >>> blogit.command_new = Mock('self.command_new')
         >>> blogit.list_edit()
         Called vim.command('bdelete')
@@ -391,18 +399,18 @@ class BlogIt:
 
     def getPost(self, id):
         """
-        >>> blogit.blog_username, blogit.blog_password = 'user', 'password'
         >>> blogit.client = Mock('client')
         >>> xmlrpclib.MultiCall = Mock('xmlrpclib.MultiCall', returns=Mock(
         ...         'multicall', returns=[{'post_status': 'draft'}, {}]))
+
         >>> d = blogit.getPost(42)    #doctest: +ELLIPSIS
         Called xmlrpclib.MultiCall(<Mock 0x... client>)
         Called multicall.metaWeblog.getPost(42, 'user', 'password')
         Called multicall.wp.getCommentCount('', 'user', 'password', 42)
-        Called vim.eval('s:used_tags == [] || s:used_categories == []')
         Called multicall()
         >>> sorted(d.items())
         [('blogit_status', {'post_status': 'draft'}), ('post_status', 'draft')]
+
         """
         username, password = self.blog_username, self.blog_password
         multicall = xmlrpclib.MultiCall(self.client)
@@ -429,15 +437,11 @@ class BlogIt:
         >>> xmlrpclib.MultiCall = Mock('xmlrpclib.MultiCall', returns=Mock(
         ...         'multicall', returns=[], tracker=None))
         >>> vim.command = Mock('vim.command')
-        >>> blogit.blog_username = 'User Name'
         >>> blogit.append_comment_to_buffer = Mock('append_comment_to_buffer')
         >>> blogit.changed_comments = Mock('changed_comments', returns=[])
         >>> blogit.getComments(42)   #doctest: +ELLIPSIS +NORMALIZE_WHITESPACE
         Called vim.command('enew')
         Called xmlrpclib.MultiCall(<Mock 0x... client>)
-        Called vim.eval('blogit_password')
-        Called vim.eval('blogit_password')
-        Called vim.eval('blogit_password')
         Called append_comment_to_buffer()
         Called vim.command(
             'setlocal nomodified linebreak
@@ -454,7 +458,7 @@ class BlogIt:
         multicall = xmlrpclib.MultiCall(self.client)
         for comment_typ in ( 'hold', 'spam', 'approve' ):
             multicall.wp.getComments('',
-                    self.blog_username, blogit.blog_password,
+                    self.blog_username, self.blog_password,
                     { 'post_id': id, 'status': comment_typ,
                       'offset': offset, 'number': 1000 })
         self.append_comment_to_buffer()
@@ -499,12 +503,12 @@ class BlogIt:
         ...             'unknown': 'tag'},
         ...     '2': { 'content': 'Same Text', 'Date': 'old', 'status': 'hold'},
         ...     '3': { 'content': 'Same Again', 'status': 'hold'} }
-        >>> vim.current.buffer = [
+        >>> vim.current.buffer = Mock_Buffer([
         ...     60 * '=', 'ID: 1 ', 'Status: hold', '', 'Changed Text',
         ...     60 * '=', 'ID:  ', 'Status: hold', '', 'New Text',
         ...     60 * '=', 'ID: 2', 'Status: hold', 'Date: new', '', 'Same Text',
         ...     60 * '=', 'ID: 3', 'Status: spam', '', 'Same Again',
-        ... ]
+        ... ])
         >>> list(blogit.changed_comments())
         [{'content': u'Changed Text', 'status': u'hold', 'unknown': 'tag'}, {'status': u'hold', 'content': u'New Text'}, {'content': u'Same Again', 'status': u'spam'}]
         """
@@ -524,12 +528,12 @@ class BlogIt:
     def read_comments(self):
         r""" Yields a dict for each comment in the current buffer.
 
-        >>> vim.current.buffer = [
+        >>> vim.current.buffer = Mock_Buffer([
         ...     60 * '=', 'section header',
         ...     60 * '=', 'Tag2: Val2 ',
         ...     60 * '=',
         ...     'Tag:  Value  ', '', 'Some Text', 'in two lines.', '', '',
-        ... ]
+        ... ])
         >>> list(blogit.read_comments())
         [{'content': 'Some Text\nin two lines.', 'Tag': 'Value'}]
         """
@@ -569,14 +573,13 @@ class BlogIt:
         Formats and appends a given comment to the current buffer. Appends
         an comment template if None is given.
 
-        >>> vim.current.buffer = ['']
+        >>> vim.current.buffer = Mock_Buffer([''])
         >>> blogit.current_comments = { 'blog_id': 0 }
-        >>> blogit.blog_username = 'User Name'
         >>> blogit.append_comment_to_buffer()
         >>> vim.current.buffer   #doctest: +NORMALIZE_WHITESPACE
         ['======================================================================== {{{1',
         'Status: new',
-        'Author: User Name',
+        'Author: user',
         'ID: ',
         'Parent: 0',
         'Date: ',
@@ -625,7 +628,8 @@ class BlogIt:
 
         Can raise FilterException.
 
-        >>> vim.current.buffer = [ 'one', 'two', 'tree', 'four' ]
+        >>> vim.current.buffer = Mock_Buffer([ 'one', 'two', 'tree', 'four' ])
+        >>> mock('vim.eval')
 
         >>> blogit.getText(0)
         Called vim.eval('exists("blogit_format")')
@@ -639,25 +643,26 @@ class BlogIt:
         Called vim.eval('exists("blogit_format")')
         ['']
 
-        >>> vim.eval = Mock('vim.eval', returns_iter=['1', 'sort'])
+        >>> mock('vim.eval', returns_iter=['1', 'sort'])
         >>> blogit.getText(0)
         Called vim.eval('exists("blogit_format")')
         Called vim.eval('blogit_format')
         ['four\none\ntree\ntwo\n']
 
-        >>> vim.eval = Mock('vim.eval', returns_iter=['1', 'false'])
+        >>> mock('vim.eval', returns_iter=['1', 'false'])
         >>> blogit.getText(0)     # can't get this to work :'(
         Traceback (most recent call last):
             ...
         FilterException
+
+        >>> minimock.restore()
         """
         text = '\n'.join(vim.current.buffer[start_line:])
         return map(self.format, text.split('\n<!--more-->\n\n'))
 
     def unformat(self, text):
         r"""
-        >>> old = vim.eval
-        >>> vim.eval = Mock('vim.eval', returns_iter=[ '1', 'false' ])
+        >>> mock('vim.eval', returns_iter=[ '1', 'false' ])
         >>> blogit.unformat('some random text')
         ...         #doctest: +NORMALIZE_WHITESPACE
         Called vim.eval('exists("blogit_unformat")')
@@ -666,7 +671,7 @@ class BlogIt:
                 with:false\n')
         'some random text'
 
-        >>> vim.eval = old
+        >>> minimock.restore()
         """
         try:
             return self.format(text, 'blogit_unformat')
@@ -679,36 +684,36 @@ class BlogIt:
 
         Can raise FilterException.
 
+        >>> mock('vim.eval')
         >>> blogit.format('some random text')
         Called vim.eval('exists("blogit_format")')
         'some random text'
 
-        >>> old = vim.eval
-        >>> vim.eval = Mock('vim.eval', returns_iter=[ '1', 'false' ])
+        >>> mock('vim.eval', returns_iter=[ '1', 'false' ])
         >>> blogit.format('some random text')
         Traceback (most recent call last):
             ...
         FilterException
 
-        >>> vim.eval = Mock('vim.eval', returns_iter=[ '1', 'rev' ])
+        >>> mock('vim.eval', returns_iter=[ '1', 'rev' ])
         >>> blogit.format('')
         Called vim.eval('exists("blogit_format")')
         Called vim.eval('blogit_format')
         ''
 
-        >>> vim.eval = Mock('vim.eval', returns_iter=[ '1', 'rev' ])
+        >>> mock('vim.eval', returns_iter=[ '1', 'rev' ])
         >>> blogit.format('some random text')
         Called vim.eval('exists("blogit_format")')
         Called vim.eval('blogit_format')
         'txet modnar emos\n'
 
-        >>> vim.eval = Mock('vim.eval', returns_iter=[ '1', 'rev' ])
+        >>> mock('vim.eval', returns_iter=[ '1', 'rev' ])
         >>> blogit.format('some random text\nwith a second line')
         Called vim.eval('exists("blogit_format")')
         Called vim.eval('blogit_format')
         'txet modnar emos\nenil dnoces a htiw\n'
 
-        >>> vim.eval = old
+        >>> minimock.restore()
 
         """
         if not vim.eval('exists("%s")' % vim_var) == '1':
@@ -841,31 +846,44 @@ class BlogIt:
 
     @property
     def blog_username(self):
-        return vim.eval(self.blog_name + '_username')
+        ret = vim.eval(self.blog_name + '_username')
+        if ret is None:
+            return 'user'    # for testing
+        return ret
 
     @property
     def blog_password(self):
-        return vim.eval(self.blog_name + '_password')
+        ret = vim.eval(self.blog_name + '_password')
+        if ret is None:
+            return 'password'    # for testing
+        return ret
 
     @property
     def blog_url(self):
         """
-        >>> vim.eval.mock_returns = 'http://example.com'
-        >>> blogit.blog_name='blogit'
+        >>> mock('vim.eval', returns='http://example.com')
         >>> blogit.blog_url
+        Called vim.eval("exists('b:blog_name')")
+        Called vim.eval("exists('blog_name')")
         Called vim.eval('blogit_url')
         'http://example.com'
+        >>> minimock.restore()
         """
-        return vim.eval(self.blog_name + '_url')
+        ret = vim.eval(self.blog_name + '_url')
+        if ret is None:
+            return 'http://example.com'
+        return ret
 
     @property
     def blog_name(self):
         """
-        >>> vim.eval = Mock('vim.eval')
+        >>> mock('vim.eval')
         >>> blogit.blog_name
         Called vim.eval("exists('b:blog_name')")
         Called vim.eval("exists('blog_name')")
         'blogit'
+
+        >>> minimock.restore()
 
         """
         if vim.eval("exists('b:blog_name')") == '1':

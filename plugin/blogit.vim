@@ -154,7 +154,7 @@ try:
 except ImportError:
     # Used outside of vim (for testing)
     from minimock import Mock, mock
-    import doctest, minimock
+    import minimock, doctest
     vim = Mock('vim', tracker=None)
 
     class Mock_Buffer(list):
@@ -270,10 +270,12 @@ class BlogIt(object):
         Called vim.command('Blogit edit 12')
 
         >>> vim.current.buffer = Mock_Buffer([ 'no blog id 12' ])
-        >>> blogit.command_new = Mock('self.command_new')
+        >>> mock('blogit.command_new')
         >>> blogit.list_edit()
         Called vim.command('bdelete')
-        Called self.command_new()
+        Called blogit.command_new()
+
+        >>> minimock.restore()
         """
         row, col = vim.current.window.cursor
         id = vim.current.buffer[row-1].split()[0]
@@ -399,17 +401,18 @@ class BlogIt(object):
 
     def getPost(self, id):
         """
-        >>> blogit.client = Mock('client')
-        >>> xmlrpclib.MultiCall = Mock('xmlrpclib.MultiCall', returns=Mock(
+        >>> mock('xmlrpclib.MultiCall', returns=Mock(
         ...         'multicall', returns=[{'post_status': 'draft'}, {}]))
 
-        >>> d = blogit.getPost(42)    #doctest: +ELLIPSIS
-        Called xmlrpclib.MultiCall(<Mock 0x... client>)
+        >>> d = blogit.getPost(42)
+        Called xmlrpclib.MultiCall(<ServerProxy for example.com/RPC2>)
         Called multicall.metaWeblog.getPost(42, 'user', 'password')
         Called multicall.wp.getCommentCount('', 'user', 'password', 42)
         Called multicall()
         >>> sorted(d.items())
         [('blogit_status', {'post_status': 'draft'}), ('post_status', 'draft')]
+
+        >>> minimock.restore()
 
         """
         username, password = self.blog_username, self.blog_password
@@ -433,21 +436,22 @@ class BlogIt(object):
     def getComments(self, id=None, offset=0):
         """ Lists the comments to a post with given id in a new buffer.
 
-        >>> blogit.client = Mock('client')
         >>> xmlrpclib.MultiCall = Mock('xmlrpclib.MultiCall', returns=Mock(
         ...         'multicall', returns=[], tracker=None))
-        >>> vim.command = Mock('vim.command')
-        >>> blogit.append_comment_to_buffer = Mock('append_comment_to_buffer')
-        >>> blogit.changed_comments = Mock('changed_comments', returns=[])
-        >>> blogit.getComments(42)   #doctest: +ELLIPSIS +NORMALIZE_WHITESPACE
+        >>> mock('vim.command')
+        >>> mock('blogit.append_comment_to_buffer')
+        >>> mock('blogit.changed_comments', returns=[])
+        >>> blogit.getComments(42)   #doctest: +NORMALIZE_WHITESPACE
         Called vim.command('enew')
-        Called xmlrpclib.MultiCall(<Mock 0x... client>)
-        Called append_comment_to_buffer()
+        Called xmlrpclib.MultiCall(<ServerProxy for example.com/RPC2>)
+        Called blogit.append_comment_to_buffer()
         Called vim.command(
             'setlocal nomodified linebreak
                       foldmethod=marker foldtext=CommentsFoldText()
                       completefunc=BlogitComplete')
-        Called changed_comments()
+        Called blogit.changed_comments()
+
+        >>> minimock.restore()
         """
         if id is None:
             id = self.current_comments['blog_id']
@@ -509,8 +513,10 @@ class BlogIt(object):
         ...     60 * '=', 'ID: 2', 'Status: hold', 'Date: new', '', 'Same Text',
         ...     60 * '=', 'ID: 3', 'Status: spam', '', 'Same Again',
         ... ])
-        >>> list(blogit.changed_comments())
-        [{'content': u'Changed Text', 'status': u'hold', 'unknown': 'tag'}, {'status': u'hold', 'content': u'New Text'}, {'content': u'Same Again', 'status': u'spam'}]
+        >>> list(blogit.changed_comments())    #doctest: +NORMALIZE_WHITESPACE
+        [{'content': u'Changed Text', 'status': u'hold', 'unknown': 'tag'},
+         {'status': u'hold', 'content': u'New Text'},
+         {'content': u'Same Again', 'status': u'spam'}]
         """
         ignored_tags = set([ 'ID', 'Date' ])
 
@@ -802,8 +808,8 @@ class BlogIt(object):
         ...             { 'status': 'rm', 'comment_id': 100 } ])
         >>> mock('xmlrpclib.MultiCall', returns=Mock(
         ...         'multicall', returns=[ 200, False, True, True ]))
-        >>> blogit.sendComments()    #doctest: +ELLIPSIS, +NORMALIZE_WHITESPACE
-        Called xmlrpclib.MultiCall(<Mock 0x... client>)
+        >>> blogit.sendComments()    #doctest: +NORMALIZE_WHITESPACE
+        Called xmlrpclib.MultiCall(<ServerProxy for example.com/RPC2>)
         Called blogit.changed_comments()
         Called multicall.wp.newComment(
             '', 'user', 'password', 42,

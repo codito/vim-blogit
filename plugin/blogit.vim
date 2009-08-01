@@ -146,9 +146,9 @@ try:
     import vim
 except ImportError:
     # Used outside of vim (for testing)
-    from minimock import Mock
+    from minimock import Mock, mock
+    import doctest, minimock
     vim = Mock('vim')
-    import doctest
 else:
     doctest = False
 import xmlrpclib, sys, re
@@ -422,7 +422,7 @@ class BlogIt:
         d['blogit_status'] = comments
         return d
 
-    def getComments(self, id, offset=0):
+    def getComments(self, id=None, offset=0):
         """ Lists the comments to a post with given id in a new buffer.
 
         >>> blogit.client = Mock('client')
@@ -445,7 +445,11 @@ class BlogIt:
                       completefunc=BlogitComplete')
         Called changed_comments()
         """
-        vim.command('enew')
+        if id is None:
+            id = self.current_comments['blog_id']
+            vim.current.buffer[:] = None
+        else:
+            vim.command('enew')
         self.current_comments = { 'blog_id': id }
         multicall = xmlrpclib.MultiCall(self.client)
         for comment_typ in ( 'hold', 'spam', 'approve' ):
@@ -478,14 +482,14 @@ class BlogIt:
             # no comment should have id 'blog_id'.
             sys.stderr.write('A comment used reserved id "blog_id"')
         elif list(self.changed_comments()) != []:
-            sys.stderr.write('Bug in BlogIt: Deactivating comment editing.')
-            print list(self.changed_comments())
+            sys.stderr.write('Bug in BlogIt: Deactivating comment editing:\n')
             for d in self.changed_comments():
-                sys.stderr.write('\n%s' % d['comment_id'])
+                sys.stderr.write('  %s' % d['comment_id'])
+            #print list(self.changed_comments())
         else:
             return
         vim.command('setlocal nomodifiable')
-        del self.current_comments['blog_id']
+        del self.current_comments
 
     def changed_comments(self):
         """ Yields comments with changes made to in the vim buffer.
@@ -493,22 +497,25 @@ class BlogIt:
         >>> blogit.current_comments = { '': { 'status': 'new'},
         ...     '1': { 'content': 'Old Text', 'status': 'hold',
         ...             'unknown': 'tag'},
-        ...     '2': { 'content': 'Same Text', 'status': 'hold'},
+        ...     '2': { 'content': 'Same Text', 'Date': 'old', 'status': 'hold'},
         ...     '3': { 'content': 'Same Again', 'status': 'hold'} }
         >>> vim.current.buffer = [
-        ...     60 * '=', 'ID:  1 ', 'Status: hold', '', 'Changed Text',
+        ...     60 * '=', 'ID: 1 ', 'Status: hold', '', 'Changed Text',
         ...     60 * '=', 'ID:  ', 'Status: hold', '', 'New Text',
-        ...     60 * '=', 'ID:  2', 'Status: hold', '', 'Same Text',
-        ...     60 * '=', 'ID:  3', 'Status: spam', '', 'Same Again',
+        ...     60 * '=', 'ID: 2', 'Status: hold', 'Date: new', '', 'Same Text',
+        ...     60 * '=', 'ID: 3', 'Status: spam', '', 'Same Again',
         ... ]
         >>> list(blogit.changed_comments())
         [{'content': u'Changed Text', 'status': u'hold', 'unknown': 'tag'}, {'status': u'hold', 'content': u'New Text'}, {'content': u'Same Again', 'status': u'spam'}]
         """
+        ignored_tags = set([ 'ID', 'Date' ])
 
         for comment in self.read_comments():
             original_comment = self.current_comments[comment['ID']]
             updated_comment = original_comment.copy()
-            for t in ( 'content', 'Status' ):
+            for t in comment.keys():
+                if t in ignored_tags:
+                    continue
                 updated_comment[self.comments_meta_data_dict[t]] = \
                         comment[t].decode('utf-8')
             if original_comment != updated_comment:
@@ -778,6 +785,60 @@ class BlogIt:
         except Fault, e:
             sys.stderr.write(e.faultString)
 
+    def sendComments(self):
+        """ Send changed and new comments to server.
+
+        >>> blogit.current_comment = { 'blog_id': 42 }
+        >>> mock('blogit.getComments')
+        >>> mock('blogit.changed_comments',
+        ...         returns=[ { 'status': 'new', 'content': 'New Text' },
+        ...             { 'status': 'will fail', 'comment_id': 13 },
+        ...             { 'status': 'will succeed', 'comment_id': 7 },
+        ...             { 'status': 'rm', 'comment_id': 100 } ])
+        >>> mock('xmlrpclib.MultiCall', returns=Mock(
+        ...         'multicall', returns=[ 200, False, True, True ]))
+        >>> blogit.sendComments()    #doctest: +ELLIPSIS, +NORMALIZE_WHITESPACE
+        Called xmlrpclib.MultiCall(<Mock 0x... client>)
+        Called blogit.changed_comments()
+        Called multicall.wp.newComment(
+            '', 'user', 'password', 42,
+            {'status': 'approve', 'content': 'New Text'})
+        Called multicall.wp.editComment(
+            '', 'user', 'password', 13, {'status': 'will fail'})
+        Called multicall.wp.editComment(
+            '', 'user', 'password', 7, {'status': 'will succeed'})
+        Called multicall.wp.deleteComment('', 'user', 'password', 100)
+        Called multicall()
+        Called stderr.write('Server refuses update to 13.')
+        Called blogit.getComments()
+
+        >>> minimock.restore()
+
+        """
+        multicall = xmlrpclib.MultiCall(self.client)
+        username, password = self.blog_username, self.blog_password
+        blog_id = self.current_comments['blog_id']
+        multicall_log = []
+        for comment in self.changed_comments():
+            if comment['status'] == 'new':
+                comment['status'] = 'approve'
+                multicall.wp.newComment(
+                        '', username, password, blog_id, comment)
+                multicall_log.append('new')
+            elif comment['status'] == 'rm':
+                multicall.wp.deleteComment(
+                        '', username, password, comment['comment_id'])
+            else:
+                comment_id = comment['comment_id']
+                del comment['comment_id']
+                multicall.wp.editComment(
+                        '', username, password, comment_id, comment)
+                multicall_log.append(comment_id)
+        for accepted, comment_id in zip(multicall(), multicall_log):
+            if comment_id != 'new' and not accepted:
+                sys.stderr.write('Server refuses update to %s.' % comment_id)
+        self.getComments()
+
     @property
     def blog_username(self):
         return vim.eval(self.blog_name + '_username')
@@ -923,8 +984,11 @@ class BlogIt:
 
     @vimcommand
     def command_commit(self):
-        """ commit current post """
-        self.sendArticle()
+        """ commit current post or comments """
+        if self.current_comments is not None:
+            self.sendComments()
+        else:
+            self.sendArticle()
 
     @vimcommand
     def command_push(self):

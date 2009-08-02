@@ -153,12 +153,40 @@ try:
     import vim
 except ImportError:
     # Used outside of vim (for testing)
-    from minimock import Mock, mock
+    from minimock import Mock, mock, AbstractTracker
     import minimock, doctest
-    vim = Mock('vim', tracker=None)
 
     class Mock_Buffer(list):
         number = 3
+
+    def Mock_Vim(**kw):
+        """ Creates a Mock for the vim module.
+
+        vim.eval calls to blogit_(username|password|url|name) are so frequent
+        that we don't want to pollute doctest output with it.
+
+        mock_vim_eval is a hook for other calls to eval.
+        """
+        class FailTracker(AbstractTracker):
+            def __init__(self, *args, **kw):
+                pass
+
+        vim = Mock('vim', tracker=FailTracker(), **kw)
+
+        def vim_eval_default_values(command):
+            d = { 'blogit_username': 'user', 'blogit_password': 'password',
+                  'blogit_url': 'http://example.com',
+                  "exists('b:blog_name')": 0, "exists('blog_name')": 0,
+                }
+            try:
+                return d[command]
+            except KeyError:
+                return vim.mock_vim_eval(command)
+
+        vim.eval = vim_eval_default_values
+        return vim
+
+    vim = Mock_Vim()
 else:
     doctest = False
 
@@ -403,11 +431,13 @@ class BlogIt(object):
         """
         >>> mock('xmlrpclib.MultiCall', returns=Mock(
         ...         'multicall', returns=[{'post_status': 'draft'}, {}]))
+        >>> mock('vim.mock_vim_eval')
 
         >>> d = blogit.getPost(42)
         Called xmlrpclib.MultiCall(<ServerProxy for example.com/RPC2>)
         Called multicall.metaWeblog.getPost(42, 'user', 'password')
         Called multicall.wp.getCommentCount('', 'user', 'password', 42)
+        Called vim.mock_vim_eval('s:used_tags == [] || s:used_categories == []')
         Called multicall()
         >>> sorted(d.items())
         [('blogit_status', {'post_status': 'draft'}), ('post_status', 'draft')]
@@ -852,17 +882,11 @@ class BlogIt(object):
 
     @property
     def blog_username(self):
-        ret = vim.eval(self.blog_name + '_username')
-        if ret is None:
-            return 'user'    # for testing
-        return ret
+        return vim.eval(self.blog_name + '_username')
 
     @property
     def blog_password(self):
-        ret = vim.eval(self.blog_name + '_password')
-        if ret is None:
-            return 'password'    # for testing
-        return ret
+        return vim.eval(self.blog_name + '_password')
 
     @property
     def blog_url(self):
@@ -875,10 +899,7 @@ class BlogIt(object):
         'http://example.com'
         >>> minimock.restore()
         """
-        ret = vim.eval(self.blog_name + '_url')
-        if ret is None:
-            return 'http://example.com'
-        return ret
+        return vim.eval(self.blog_name + '_url')
 
     @property
     def blog_name(self):

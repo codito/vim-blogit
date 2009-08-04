@@ -39,8 +39,15 @@
 "   Remove an article
 " ":Blogit tags"
 "   Show tags and categories list
+" ":Blogit preview"
+"   Preview current post locally
 " ":Blogit help"
 "   Display help
+"
+" Note that preview might not word on all platforms. This is because we have
+" to rely on unsupported and non-portable functionality from the python 
+" standard library.
+"
 "
 " Configuration :
 "   Create a file called passwords.vim somewhere in your 'runtimepath'
@@ -148,6 +155,7 @@ from calendar import timegm
 from subprocess import Popen, CalledProcessError, PIPE
 from xmlrpclib import DateTime, Fault, MultiCall
 from inspect import getargspec
+import webbrowser, tempfile
 
 try:
     import vim
@@ -1083,6 +1091,22 @@ class BlogIt(object):
         vim.command('let s:used_categories = %s' % categories)
         sys.stdout.write('\n \n \nCategories\n==========\n \n' + ', '.join(categories))
         sys.stdout.write('\n \n \nTags\n====\n \n' + ', '.join(tags))
+
+    @vimcommand
+    def command_preview(self):
+        """ preview current post locally """
+        if self.prev_file is None:
+            self.prev_file = tempfile.mkstemp('.html', 'blogit')[1]
+        f = open(self.prev_file, 'w')
+        start_text = 0
+        for line in vim.current.buffer:
+            start_text += 1
+            if line == '':
+                break
+        f.write(self.getText(start_text))
+        f.flush()
+        f.close()
+        webbrowser.open(self.prev_file)
 
     @vimcommand
     def command_help(self):

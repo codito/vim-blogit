@@ -68,6 +68,11 @@
 "   edit, respectively. In the example we use pandoc[1] to edit the blog in
 "   reStructuredText[2].
 "
+"   If the program only converts to html, you can have blogit save the
+"   "source" in an html comment:
+"
+"       let blogit_postsource=1
+"
 "   If you have multible blogs replace 'blogit' in 'blogit_username' etc. by a
 "   name of your choice (e.g. 'your_blog_name') and use:
 "
@@ -677,28 +682,32 @@ class BlogIt(object):
         Can raise FilterException.
 
         >>> vim.current.buffer = Mock_Buffer([ 'one', 'two', 'tree', 'four' ])
-        >>> mock('vim.eval')
+        >>> mock('vim.mocked_eval')
 
         >>> blogit.getText(0)
-        Called vim.eval('exists("blogit_format")')
+        Called vim.mocked_eval("exists('blogit_format')")
+        Called vim.mocked_eval("exists('blogit_postsource')")
         ['one\ntwo\ntree\nfour']
 
         >>> blogit.getText(1)
-        Called vim.eval('exists("blogit_format")')
+        Called vim.mocked_eval("exists('blogit_format')")
+        Called vim.mocked_eval("exists('blogit_postsource')")
         ['two\ntree\nfour']
 
         >>> blogit.getText(4)
-        Called vim.eval('exists("blogit_format")')
+        Called vim.mocked_eval("exists('blogit_format')")
+        Called vim.mocked_eval("exists('blogit_postsource')")
         ['']
 
-        >>> mock('vim.eval', returns_iter=['1', 'sort'])
+        >>> mock('vim.mocked_eval', returns_iter=['1', 'sort', '0'])
         >>> blogit.getText(0)
-        Called vim.eval('exists("blogit_format")')
-        Called vim.eval('blogit_format')
+        Called vim.mocked_eval("exists('blogit_format')")
+        Called vim.mocked_eval('blogit_format')
+        Called vim.mocked_eval("exists('blogit_postsource')")
         ['four\none\ntree\ntwo\n']
 
-        >>> mock('vim.eval', returns_iter=['1', 'false'])
-        >>> blogit.getText(0)     # can't get this to work :'(
+        >>> mock('vim.mocked_eval', returns_iter=['1', 'false'])
+        >>> blogit.getText(0)
         Traceback (most recent call last):
             ...
         FilterException
@@ -710,64 +719,77 @@ class BlogIt(object):
 
     def unformat(self, text):
         r"""
-        >>> mock('vim.eval', returns_iter=[ '1', 'false' ])
+        >>> mock('vim.mocked_eval', returns_iter=[ '1', 'false' ])
         >>> blogit.unformat('some random text')
         ...         #doctest: +NORMALIZE_WHITESPACE
-        Called vim.eval('exists("blogit_unformat")')
-        Called vim.eval('blogit_unformat')
+        Called vim.mocked_eval("exists('blogit_unformat')")
+        Called vim.mocked_eval('blogit_unformat')
         Called stderr.write('Blogit: Error happend while filtering
                 with:false\n')
         'some random text'
 
+        >>> blogit.unformat('''\n\n
+        ...         \n <!--blogit-- Post Source --blogit--> <h1>HTML</h1>''')
+        'Post Source'
+
         >>> minimock.restore()
         """
+        if text.lstrip().startswith('<!--blogit-- '):
+            return ( text.replace('<!--blogit--', '', 1).
+                    split(' --blogit-->', 1)[0].strip() )
         try:
-            return self.format(text, 'blogit_unformat')
+            return self.filter(text, 'unformat')
         except self.FilterException, e:
             sys.stderr.write(e.message)
             return e.input_text
 
-    def format(self, text, vim_var='blogit_format'):
+    def format(self, text):
+        formated = self.filter(text, 'format')
+        if self.blog_postsource:
+            formated = "<!--blogit--\n%s\n--blogit-->\n%s" % ( text, formated )
+        return formated
+
+    def filter(self, text, vim_var='format'):
         r""" Filter text with command in vim_var.
 
         Can raise FilterException.
 
-        >>> mock('vim.eval')
-        >>> blogit.format('some random text')
-        Called vim.eval('exists("blogit_format")')
+        >>> mock('vim.mocked_eval')
+        >>> blogit.filter('some random text')
+        Called vim.mocked_eval("exists('blogit_format')")
         'some random text'
 
-        >>> mock('vim.eval', returns_iter=[ '1', 'false' ])
-        >>> blogit.format('some random text')
+        >>> mock('vim.mocked_eval', returns_iter=[ '1', 'false' ])
+        >>> blogit.filter('some random text')
         Traceback (most recent call last):
             ...
         FilterException
 
-        >>> mock('vim.eval', returns_iter=[ '1', 'rev' ])
-        >>> blogit.format('')
-        Called vim.eval('exists("blogit_format")')
-        Called vim.eval('blogit_format')
+        >>> mock('vim.mocked_eval', returns_iter=[ '1', 'rev' ])
+        >>> blogit.filter('')
+        Called vim.mocked_eval("exists('blogit_format')")
+        Called vim.mocked_eval('blogit_format')
         ''
 
-        >>> mock('vim.eval', returns_iter=[ '1', 'rev' ])
-        >>> blogit.format('some random text')
-        Called vim.eval('exists("blogit_format")')
-        Called vim.eval('blogit_format')
+        >>> mock('vim.mocked_eval', returns_iter=[ '1', 'rev' ])
+        >>> blogit.filter('some random text')
+        Called vim.mocked_eval("exists('blogit_format')")
+        Called vim.mocked_eval('blogit_format')
         'txet modnar emos\n'
 
-        >>> mock('vim.eval', returns_iter=[ '1', 'rev' ])
-        >>> blogit.format('some random text\nwith a second line')
-        Called vim.eval('exists("blogit_format")')
-        Called vim.eval('blogit_format')
+        >>> mock('vim.mocked_eval', returns_iter=[ '1', 'rev' ])
+        >>> blogit.filter('some random text\nwith a second line')
+        Called vim.mocked_eval("exists('blogit_format')")
+        Called vim.mocked_eval('blogit_format')
         'txet modnar emos\nenil dnoces a htiw\n'
 
         >>> minimock.restore()
 
         """
-        if not vim.eval('exists("%s")' % vim_var) == '1':
+        filter = self.vim_variable(vim_var)
+        if filter is None:
             return text
         try:
-            filter = vim.eval(vim_var)
             p = Popen(filter, shell=True, stdin=PIPE, stdout=PIPE, stderr=PIPE)
             p.stdin.write(text)
             p.stdin.close()
@@ -914,6 +936,12 @@ class BlogIt(object):
         >>> minimock.restore()
         """
         return self.vim_variable('url')
+
+    @property
+    def blog_postsource(self):
+        """ Bool: Include the unformated version of a post in an html comment.
+        """
+        return self.vim_variable('postsource') == '1'
 
     @property
     def blog_name(self):

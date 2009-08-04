@@ -159,29 +159,33 @@ except ImportError:
     class Mock_Buffer(list):
         number = 3
 
-    def Mock_Vim(**kw):
+    def Mock_Vim(vim_vars=None, **kw):
         """ Creates a Mock for the vim module.
 
         vim.eval calls to blogit_(username|password|url|name) are so frequent
         that we don't want to pollute doctest output with it.
 
-        mock_vim_eval is a hook for other calls to eval.
+        mocked_eval is a hook for other calls to eval.
         """
         class FailTracker(AbstractTracker):
             def __init__(self, *args, **kw):
                 pass
 
         vim = Mock('vim', tracker=FailTracker(), **kw)
+        if vim_vars is None:
+            vim_vars = { 'blog_name': 'blogit', 'blogit_username': 'user',
+                         'blogit_password': 'password',
+                         'blogit_url': 'http://example.com',
+                       }
+        for var_name in vim_vars.keys():
+            vim_vars["exists('%s')" % var_name] = '1'
+            vim_vars["exists('b:%s')" % var_name] = '0'
 
         def vim_eval_default_values(command):
-            d = { 'blogit_username': 'user', 'blogit_password': 'password',
-                  'blogit_url': 'http://example.com',
-                  "exists('b:blog_name')": 0, "exists('blog_name')": 0,
-                }
             try:
-                return d[command]
+                return vim_vars[command]
             except KeyError:
-                return vim.mock_vim_eval(command)
+                return vim.mocked_eval(command)
 
         vim.eval = vim_eval_default_values
         return vim
@@ -431,13 +435,13 @@ class BlogIt(object):
         """
         >>> mock('xmlrpclib.MultiCall', returns=Mock(
         ...         'multicall', returns=[{'post_status': 'draft'}, {}]))
-        >>> mock('vim.mock_vim_eval')
+        >>> mock('vim.mocked_eval')
 
         >>> d = blogit.getPost(42)
         Called xmlrpclib.MultiCall(<ServerProxy for example.com/RPC2>)
         Called multicall.metaWeblog.getPost(42, 'user', 'password')
         Called multicall.wp.getCommentCount('', 'user', 'password', 42)
-        Called vim.mock_vim_eval('s:used_tags == [] || s:used_categories == []')
+        Called vim.mocked_eval('s:used_tags == [] || s:used_categories == []')
         Called multicall()
         >>> sorted(d.items())
         [('blogit_status', {'post_status': 'draft'}), ('post_status', 'draft')]
@@ -882,43 +886,43 @@ class BlogIt(object):
 
     @property
     def blog_username(self):
-        return vim.eval(self.blog_name + '_username')
+        return self.vim_variable('username')
 
     @property
     def blog_password(self):
-        return vim.eval(self.blog_name + '_password')
+        return self.vim_variable('password')
 
     @property
     def blog_url(self):
         """
-        >>> mock('vim.eval', returns='http://example.com')
+        >>> mock('vim.eval',
+        ...      returns_iter=[ '0', '0', '1', 'http://example.com/' ])
         >>> blogit.blog_url
         Called vim.eval("exists('b:blog_name')")
         Called vim.eval("exists('blog_name')")
+        Called vim.eval("exists('blogit_url')")
         Called vim.eval('blogit_url')
-        'http://example.com'
+        'http://example.com/'
         >>> minimock.restore()
         """
-        return vim.eval(self.blog_name + '_url')
+        return self.vim_variable('url')
 
     @property
     def blog_name(self):
-        """
-        >>> mock('vim.eval')
-        >>> blogit.blog_name
-        Called vim.eval("exists('b:blog_name')")
-        Called vim.eval("exists('blog_name')")
-        'blogit'
+        for var_name in ( 'b:blog_name', 'blog_name' ):
+            var_value = self.vim_variable(var_name, prefix=False)
+            if var_value is not None:
+                return var_value
+        return 'blogit'
 
-        >>> minimock.restore()
-
-        """
-        if vim.eval("exists('b:blog_name')") == '1':
-            return vim.eval('b:blog_name')
-        elif vim.eval("exists('blog_name')") == '1':
-            return vim.eval('blog_name')
+    def vim_variable(self, var_name, prefix=True):
+        """ Simplefy access to vim-variables. """
+        if prefix:
+            var_name = '_'.join(( self.blog_name, var_name ))
+        if vim.eval("exists('%s')" % var_name) == '1':
+            return vim.eval('%s' % var_name)
         else:
-            return 'blogit'
+            return None
 
     def vimcommand(f, register_to=vimcommand_help):
         r"""

@@ -263,22 +263,25 @@ class BlogIt(object):
 
     def command(self, command='help', *args):
         """
-        >>> xmlrpclib = Mock('xmlrpclib')
-        >>> sys.stderr = Mock('stderr')
+        >>> mock('xmlrpclib')
+        >>> mock('sys.stderr')
         >>> blogit.command('non-existant')
-        Called stderr.write('No such command: non-existant.')
+        Called sys.stderr.write('No such command: non-existant.')
 
         >>> def f(x): print 'got %s' % x
         >>> blogit.command_mocktest = f
         >>> blogit.command('mo')
-        Called stderr.write('Command mo takes 0 arguments.')
+        Called sys.stderr.write('Command mo takes 0 arguments.')
 
         >>> blogit.command('mo', 2)
         got 2
 
         >>> blogit.command_mockambiguous = f
-        >>> blogit.command('mo')
-        Called stderr.write('Ambiguious command mo: mockambiguous, mocktest.')
+        >>> blogit.command('mo')    #doctest: +NORMALIZE_WHITESPACE
+        Called sys.stderr.write('Ambiguious command mo: 
+                mockambiguous, mocktest.')
+
+        >>> minimock.restore()
         """
         if self.client is None:
             self.connect()
@@ -307,7 +310,7 @@ class BlogIt(object):
 
     def list_edit(self):
         """
-        >>> vim.command = Mock('vim.command')
+        >>> mock('vim.command')
         >>> vim.current.window.cursor = (1, 2)
         >>> vim.current.buffer = Mock_Buffer([ '12 random text' ])
         >>> blogit.list_edit()
@@ -483,7 +486,7 @@ class BlogIt(object):
     def getComments(self, id=None, offset=0):
         """ Lists the comments to a post with given id in a new buffer.
 
-        >>> xmlrpclib.MultiCall = Mock('xmlrpclib.MultiCall', returns=Mock(
+        >>> mock('xmlrpclib.MultiCall', returns=Mock(
         ...         'multicall', returns=[], tracker=None))
         >>> mock('vim.command')
         >>> mock('blogit.append_comment_to_buffer')
@@ -720,11 +723,12 @@ class BlogIt(object):
     def unformat(self, text):
         r"""
         >>> mock('vim.mocked_eval', returns_iter=[ '1', 'false' ])
+        >>> mock('sys.stderr')
         >>> blogit.unformat('some random text')
         ...         #doctest: +NORMALIZE_WHITESPACE
         Called vim.mocked_eval("exists('blogit_unformat')")
         Called vim.mocked_eval('blogit_unformat')
-        Called stderr.write('Blogit: Error happend while filtering
+        Called sys.stderr.write('Blogit: Error happend while filtering
                 with:false\n')
         'some random text'
 
@@ -864,6 +868,7 @@ class BlogIt(object):
         """ Send changed and new comments to server.
 
         >>> blogit.current_comment = { 'blog_id': 42 }
+        >>> mock('sys.stderr')
         >>> mock('blogit.getComments')
         >>> mock('blogit.changed_comments',
         ...         returns=[ { 'status': 'new', 'content': 'New Text' },
@@ -884,7 +889,7 @@ class BlogIt(object):
             '', 'user', 'password', 7, {'status': 'will succeed'})
         Called multicall.wp.deleteComment('', 'user', 'password', 100)
         Called multicall()
-        Called stderr.write('Server refuses update to 13.')
+        Called sys.stderr.write('Server refuses update to 13.')
         Called blogit.getComments()
 
         >>> minimock.restore()

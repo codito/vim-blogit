@@ -187,18 +187,22 @@ class BlogIt(object):
     def __init__(self):
         self.client = None
         self.__posts = {}
-        self.__comments = {}
 
     def connect(self):
         self.client = xmlrpclib.ServerProxy(self.blog_url)
 
-    def __get_current_post(self):
+    def __get_current_data(self, page_type):
         try:
-            return self.__posts[vim.current.buffer.number]
+            t, data = self.__posts[vim.current.buffer.number]
         except KeyError:
             return None
+        else:
+            if t == page_type:
+                return data
+            else:
+                return None
 
-    def __set_current_post(self, value):
+    def __set_current_data(self, page_type, value):
         """
         >>> vim.current.buffer.change_buffer(3)
         >>> blogit.current_post = { 'p3': 3 }
@@ -206,19 +210,23 @@ class BlogIt(object):
         >>> blogit.current_post
         >>> blogit.current_post = { 'p7': 42 }
         >>> vim.current.buffer.change_buffer(3)
+        >>> blogit.current_comments
         >>> blogit.current_post
         {'p3': 3}
         """
-        self.__posts[vim.current.buffer.number] = value
+        self.__posts[vim.current.buffer.number] = ( page_type, value )
+
+    def __get_current_post(self):
+        return self.__get_current_data('post')
+
+    def __set_current_post(self, value):
+        return self.__set_current_data('post', value)
 
     def __get_current_comments(self):
-        try:
-            return self.__comments[vim.current.buffer.number]
-        except KeyError:
-            return None
+        return self.__get_current_data('comments')
 
     def __set_current_comments(self, value):
-        self.__comments[vim.current.buffer.number] = value
+        return self.__set_current_data('comments', value)
 
     current_post = property(__get_current_post, __set_current_post)
     current_comments = property(__get_current_comments, __set_current_comments)

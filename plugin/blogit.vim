@@ -172,38 +172,82 @@ except ImportError:
     class Mock_Buffer(list):
         number = 3
 
-    def Mock_Vim(vim_vars=None, **kw):
-        """ Creates a Mock for the vim module.
+        def __init__(self, *args, **kw):
+            super(Mock_Buffer, self).__init__(*args, **kw)
+            self._buffers = {}
+            if self[:] == []:
+                self[:] = ['']
+            self._buffers[self.number] = self
+
+        def change_buffer(self, number):
+            """
+            >>> b = Mock_Buffer()
+            >>> b.number
+            3
+            >>> b.change_buffer(7)
+            >>> b.number
+            7
+            """
+            self._buffers[self.number] = self[:]
+            try:
+                self[:] = self._buffers[number]
+            except KeyError:
+                self[:] = ['']
+            self._buffers[number] = self
+            self.number = number
+
+    class FailTracker(AbstractTracker):
+        """ A Mock Tracker that fails on every call. """
+        def __init__(self, *args, **kw):
+            pass
+
+    class MockVim(object):
+        """ Creates a mock for the vim module.
+
+        Use mock_vim() to create objects from MockVim.
 
         vim.eval calls to blogit_(username|password|url|name) are so frequent
         that we don't want to pollute doctest output with it.
 
-        mocked_eval is a hook for other calls to eval.
+        Holds the variables set as well as the buffers. mocked_eval is a hook
+        for other calls to eval.
         """
-        class FailTracker(AbstractTracker):
-            def __init__(self, *args, **kw):
-                pass
+        DUMMY_VIM_VARS = { 'blog_name': 'blogit',
+                           'blogit_username': 'user',
+                           'blogit_password': 'password',
+                           'blogit_url': 'http://example.com',
+                         }
 
-        vim = Mock('vim', tracker=FailTracker(), **kw)
-        if vim_vars is None:
-            vim_vars = { 'blog_name': 'blogit', 'blogit_username': 'user',
-                         'blogit_password': 'password',
-                         'blogit_url': 'http://example.com',
-                       }
-        for var_name in vim_vars.keys():
-            vim_vars["exists('%s')" % var_name] = '1'
-            vim_vars["exists('b:%s')" % var_name] = '0'
+        def __init__(self, vim, vim_vars=None):
+            self.mocked_vim = vim
+            if vim_vars is None:
+                vim_vars = self.DUMMY_VIM_VARS
+            self.vim_vars = vim_vars
+            self.update_eval_commands()
 
-        def vim_eval_default_values(command):
+        def vim_eval(self, command):
             try:
-                return vim_vars[command]
+                return self.eval_command_dict[command]
             except KeyError:
-                return vim.mocked_eval(command)
+                return self.mocked_vim.mocked_eval(command)
 
-        vim.eval = vim_eval_default_values
+        def update_eval_commands(self):
+            self.eval_command_dict = self.vim_vars.copy()
+            for var_name in self.vim_vars.keys():
+                self.eval_command_dict["exists('%s')" % var_name] = '1'
+                self.eval_command_dict["exists('b:%s')" % var_name] = '0'
+
+    def mock_vim(vim_vars=None, vim_buffer=None, **kw):
+        """ Factory for MockVim. """
+        vim = Mock('vim', **kw)
+        if vim_buffer is None:
+            vim_buffer = Mock_Buffer()
+        vim.current.buffer = vim_buffer
+        vim.vim_imitation = MockVim(vim, vim_vars)
+        vim.eval = vim.vim_imitation.vim_eval
         return vim
 
-    vim = Mock_Vim()
+    vim = mock_vim(tracker=FailTracker())
 else:
     doctest = False
 
@@ -234,6 +278,16 @@ class BlogIt(object):
             return None
 
     def __set_current_post(self, value):
+        """
+        >>> vim.current.buffer.change_buffer(3)
+        >>> blogit.current_post = { 'p3': 3 }
+        >>> vim.current.buffer.change_buffer(7)
+        >>> blogit.current_post
+        >>> blogit.current_post = { 'p7': 42 }
+        >>> vim.current.buffer.change_buffer(3)
+        >>> blogit.current_post
+        {'p3': 3}
+        """
         self.__posts[vim.current.buffer.number] = value
 
     def __get_current_comments(self):
@@ -312,12 +366,12 @@ class BlogIt(object):
         """
         >>> mock('vim.command')
         >>> vim.current.window.cursor = (1, 2)
-        >>> vim.current.buffer = Mock_Buffer([ '12 random text' ])
+        >>> vim.current.buffer[:] = [ '12 random text' ]
         >>> blogit.list_edit()
         Called vim.command('bdelete')
         Called vim.command('Blogit edit 12')
 
-        >>> vim.current.buffer = Mock_Buffer([ 'no blog id 12' ])
+        >>> vim.current.buffer[:] = [ 'no blog id 12' ]
         >>> mock('blogit.command_new')
         >>> blogit.list_edit()
         Called vim.command('bdelete')
@@ -557,12 +611,12 @@ class BlogIt(object):
         ...             'unknown': 'tag'},
         ...     '2': { 'content': 'Same Text', 'Date': 'old', 'status': 'hold'},
         ...     '3': { 'content': 'Same Again', 'status': 'hold'} }
-        >>> vim.current.buffer = Mock_Buffer([
+        >>> vim.current.buffer[:] = [
         ...     60 * '=', 'ID: 1 ', 'Status: hold', '', 'Changed Text',
         ...     60 * '=', 'ID:  ', 'Status: hold', '', 'New Text',
         ...     60 * '=', 'ID: 2', 'Status: hold', 'Date: new', '', 'Same Text',
         ...     60 * '=', 'ID: 3', 'Status: spam', '', 'Same Again',
-        ... ])
+        ... ]
         >>> list(blogit.changed_comments())    #doctest: +NORMALIZE_WHITESPACE
         [{'content': u'Changed Text', 'status': u'hold', 'unknown': 'tag'},
          {'status': u'hold', 'content': u'New Text'},
@@ -584,12 +638,12 @@ class BlogIt(object):
     def read_comments(self):
         r""" Yields a dict for each comment in the current buffer.
 
-        >>> vim.current.buffer = Mock_Buffer([
+        >>> vim.current.buffer[:] = [
         ...     60 * '=', 'section header',
         ...     60 * '=', 'Tag2: Val2 ',
         ...     60 * '=',
         ...     'Tag:  Value  ', '', 'Some Text', 'in two lines.', '', '',
-        ... ])
+        ... ]
         >>> list(blogit.read_comments())
         [{'content': 'Some Text\nin two lines.', 'Tag': 'Value'}]
         """
@@ -629,7 +683,7 @@ class BlogIt(object):
         Formats and appends a given comment to the current buffer. Appends
         an comment template if None is given.
 
-        >>> vim.current.buffer = Mock_Buffer([''])
+        >>> vim.current.buffer[:] = ['']
         >>> blogit.current_comments = { 'blog_id': 0 }
         >>> blogit.append_comment_to_buffer()
         >>> vim.current.buffer   #doctest: +NORMALIZE_WHITESPACE
@@ -684,7 +738,7 @@ class BlogIt(object):
 
         Can raise FilterException.
 
-        >>> vim.current.buffer = Mock_Buffer([ 'one', 'two', 'tree', 'four' ])
+        >>> vim.current.buffer[:] = [ 'one', 'two', 'tree', 'four' ]
         >>> mock('vim.mocked_eval')
 
         >>> blogit.getText(0)

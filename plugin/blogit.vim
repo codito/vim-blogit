@@ -1030,7 +1030,7 @@ class BlogIt(object):
     def command_this(self):
         """ make this a blog post """
         if self.current_post is None:
-            self.display_post(new_text=vim.current.buffer[:])
+            self.display_post(new_text='\n'.join(vim.current.buffer[:]))
         else:
             sys.stderr.write("Already editing a post.")
 

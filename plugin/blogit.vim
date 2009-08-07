@@ -68,11 +68,6 @@
 "   edit, respectively. In the example we use pandoc[1] to edit the blog in
 "   reStructuredText[2].
 "
-"   If the program only converts to html, you can have blogit save the
-"   "source" in an html comment:
-"
-"       let blogit_postsource=1
-"
 "   If you have multible blogs replace 'blogit' in 'blogit_username' etc. by a
 "   name of your choice (e.g. 'your_blog_name') and use:
 "
@@ -937,6 +932,12 @@ class BlogIt(object):
     @property
     def blog_postsource(self):
         """ Bool: Include the unformated version of a post in an html comment.
+
+        If the program only converts to html, you can have blogit save the
+        "source" in an html comment (Warning: This doesn't work reliably with
+        Wordpress. Use at your own risk).
+
+            let blogit_postsource=1
         """
         return self.vim_variable('postsource') == '1'
 

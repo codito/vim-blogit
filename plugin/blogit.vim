@@ -354,10 +354,10 @@ class BlogIt(object):
         """
         Yields the lines of a post body.
         """
-        content = post_data.get(post_body, '')
+        content = post_data.get(post_body, '').encode('utf-8')
         if unformat:
             content = self.unformat(content)
-        for line in content.split('\n'):
+        for line in content.splitlines():
             yield line
 
         if post_data.get('mt_text_more'):
@@ -365,8 +365,8 @@ class BlogIt(object):
             yield '<!--more-->'
             yield ''
             content = self.unformat(post_data["mt_text_more"].encode("utf-8"))
-            for line in content.split('\n'):
-                yield line
+            for line in content.splitlines():
+                yield line.encode('utf-8')
 
     def append_post(self, post_data, post_body, headers,
             meta_data_dict, meta_data_f_dict={}, unformat=False):
@@ -815,7 +815,7 @@ class BlogIt(object):
 
         def split_comma(x): return x.split(', ')
 
-        if self.current_post is None:
+        if self.current_post_type is not 'post':
             sys.stderr.write("Not editing a post.")
             return
         vim.command('set nomodified')

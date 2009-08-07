@@ -217,7 +217,7 @@ class BlogIt(object):
         >>> blogit.current_comments    #doctest: +ELLIPSIS
         Traceback (most recent call last):
         ...
-        BlogItException: This buffer stores "comments".
+        BlogItException: This buffer stores "post" not "comments".
         >>> blogit.current_post
         {'p3': 3}
         """
@@ -357,7 +357,8 @@ class BlogIt(object):
         content = post_data.get(post_body, '').encode('utf-8')
         if unformat:
             content = self.unformat(content)
-        for line in content.splitlines():
+        for line in content.split('\n'):
+            # not splitlines to preserve \r\n in comments.
             yield line
 
         if post_data.get('mt_text_more'):
@@ -365,7 +366,8 @@ class BlogIt(object):
             yield '<!--more-->'
             yield ''
             content = self.unformat(post_data["mt_text_more"].encode("utf-8"))
-            for line in content.splitlines():
+            for line in content.split('\n'):
+                # not splitlines to preserve \r\n in comments.
                 yield line.encode('utf-8')
 
     def append_post(self, post_data, post_body, headers,
@@ -553,11 +555,11 @@ class BlogIt(object):
             sys.stderr.write('Bug in BlogIt: Deactivating comment editing:\n')
             for d in self.changed_comments():
                 sys.stderr.write('  %s' % d['comment_id'])
-            #print list(self.changed_comments())
+                #print list(self.changed_comments())
         else:
             return
         vim.command('setlocal nomodifiable')
-        del self.current_comments
+        self.current_comments = None
 
     def changed_comments(self):
         """ Yields comments with changes made to in the vim buffer.
@@ -663,6 +665,7 @@ class BlogIt(object):
         self.append_post(comment, 'content', [ 'Status', 'Author',
                 'ID', 'Parent', 'Date', 'Type' ],
                 self.comments_meta_data_dict, meta_data_f_dict)
+        vim.current.buffer.append('')
         vim.current.buffer.append('')
         vim.current.buffer.append('')
         self.current_comments[str(comment['comment_id'])] = comment

@@ -321,41 +321,52 @@ class BlogIt(object):
             # via command_edit
             vim.command('Blogit edit %s' % id)
 
+    def format_header(self, post_data, label,
+            meta_data_dict, meta_data_f_dict={}):
+        """
+        Returns a header line formated as it will be displayed to the user.
+        """
+        try:
+            val = post_data[meta_data_dict[label]]
+        except KeyError:
+            val = ''
+        if label in meta_data_f_dict:
+            val = meta_data_f_dict[label](val)
+        return '%s: %s' % ( label, unicode(val).encode('utf-8') )
+
+    def format_body(self, post_data, post_body,
+            meta_data_dict, meta_data_f_dict={}, unformat=False):
+        """
+        Yields the lines of a post body.
+        """
+        content = post_data.get(post_body, '').encode("utf-8")
+        if unformat:
+            content = self.unformat(content)
+        for line in content.split('\n'):
+            yield line
+
+        if post_data.get('mt_text_more'):
+            yield ''
+            yield '<!--more-->'
+            yield ''
+            content = self.unformat(post_data["mt_text_more"].encode("utf-8"))
+            for line in content.split('\n'):
+                yield line
+
     def append_post(self, post_data, post_body, headers,
             meta_data_dict, meta_data_f_dict={}, unformat=False):
         """
         Append a post or comment to the vim buffer.
         """
-        is_first_post_in_buffer = False
-        if vim.current.buffer[:] == ['']:
+        post = ([ self.format_header(post_data, label,
+                    meta_data_dict, meta_data_f_dict) for label in headers ] +
+                [ '' ] +
+                list( self.format_body(post_data, post_body, meta_data_dict,
+                        meta_data_f_dict, unformat))  )
+        if vim.current.buffer[:] != ['']:
             # work around empty buffer has one line.
-            is_first_post_in_buffer = True
-        for label in headers:
-            try:
-                val = post_data[meta_data_dict[label]]
-            except KeyError:
-                val = ''
-            if label in meta_data_f_dict:
-                val = meta_data_f_dict[label](val)
-            vim.current.buffer.append('%s: %s' % ( label,
-                    unicode(val).encode('utf-8') ))
-        if is_first_post_in_buffer:
-            # work around empty buffer has one line.
-            vim.current.buffer[0] = None
-        vim.current.buffer.append('')
-        content = post_data.get(post_body, '').encode("utf-8")
-        if unformat:
-            content = self.unformat(content)
-        for line in content.split('\n'):
-            vim.current.buffer.append(line)
-
-        if post_data.get('mt_text_more'):
             vim.current.buffer.append('')
-            vim.current.buffer.append('<!--more-->')
-            vim.current.buffer.append('')
-            content = self.unformat(post_data["mt_text_more"].encode("utf-8"))
-            for line in content.split('\n'):
-                vim.current.buffer.append(line)
+        vim.current.buffer[-1:] = post
 
     def display_post(self, post={}, new_text=None):
         def display_comment_count(d):

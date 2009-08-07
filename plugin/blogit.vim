@@ -595,14 +595,11 @@ class BlogIt(object):
         """
 
         def process_comment(headers, body):
-            for i, line in reversed(list(enumerate(body))):
-                if line.strip() != '':
-                    body = body[:i+1]
-                    break
-            else:    # body is whitespace
+            body = '\n'.join(body).strip()
+            if body == '':
                 return None
-            d = { 'content': '\n'.join(body) }
-            for t, v in self.getMeta(headers):
+            d = { 'content': body }
+            for t, v in map(self.getMeta, headers):
                 d[t.strip()] = v.strip()
             return d
 
@@ -616,6 +613,7 @@ class BlogIt(object):
                 current_section = headers
                 if c is not None:
                     yield c
+                continue
             if current_section == headers and line.strip() == '':
                 current_section = body
                 continue
@@ -659,24 +657,18 @@ class BlogIt(object):
         vim.current.buffer.append('')
         self.current_comments[str(comment['comment_id'])] = comment
 
-    def getMeta(self, text=None):
+    def getMeta(self, line):
         """
         Reads the meta-data in the current buffer. Outputed as dictionary.
 
-        >>> list(blogit.getMeta([ 'tag: value', '', 'body: novalue' ]))
-        [('tag', 'value')]
+        >>> blogit.getMeta('tag: value')
+        ('tag', 'value')
         """
-        if text is None:
-            text = vim.current.buffer
         r = re.compile('^(.*?): (.*)$')
-        for line in text:
-            if line.rstrip() == '':
-                return
-            m = r.match(line)
-            if m:
-                yield m.group(1, 2)
+        m = r.match(line)
+        return m.group(1, 2)
 
-    def getText(self, start_line):
+    def getText(self, lines):
         r"""
         Read the blog text from vim buffer. start_line is the first
         line which is part of the test (not headers). Text is then formated
@@ -684,40 +676,29 @@ class BlogIt(object):
 
         Can raise FilterException.
 
-        >>> vim.current.buffer[:] = [ 'one', 'two', 'tree', 'four' ]
         >>> mock('vim.mocked_eval')
 
-        >>> blogit.getText(0)
+        >>> blogit.getText([ 'one', 'two', 'tree', 'four' ])
         Called vim.mocked_eval("exists('blogit_format')")
         Called vim.mocked_eval("exists('blogit_postsource')")
         ['one\ntwo\ntree\nfour']
 
-        >>> blogit.getText(1)
-        Called vim.mocked_eval("exists('blogit_format')")
-        Called vim.mocked_eval("exists('blogit_postsource')")
-        ['two\ntree\nfour']
-
-        >>> blogit.getText(4)
-        Called vim.mocked_eval("exists('blogit_format')")
-        Called vim.mocked_eval("exists('blogit_postsource')")
-        ['']
-
         >>> mock('vim.mocked_eval', returns_iter=['1', 'sort', '0'])
-        >>> blogit.getText(0)
+        >>> blogit.getText([ 'one', 'two', 'tree', 'four' ])
         Called vim.mocked_eval("exists('blogit_format')")
         Called vim.mocked_eval('blogit_format')
         Called vim.mocked_eval("exists('blogit_postsource')")
         ['four\none\ntree\ntwo\n']
 
         >>> mock('vim.mocked_eval', returns_iter=['1', 'false'])
-        >>> blogit.getText(0)
+        >>> blogit.getText([ 'one', 'two', 'tree', 'four' ])
         Traceback (most recent call last):
             ...
         FilterException
 
         >>> minimock.restore()
         """
-        text = '\n'.join(vim.current.buffer[start_line:])
+        text = '\n'.join(lines)
         return map(self.format, text.split('\n<!--more-->\n\n'))
 
     def unformat(self, text):
@@ -827,42 +808,40 @@ class BlogIt(object):
         if self.current_post is None:
             sys.stderr.write("Not editing a post.")
             return
-        try:
-            vim.command('set nomodified')
-            start_text = 0
-            for line in vim.current.buffer:
+        vim.command('set nomodified')
+        for start_text, line in enumerate(vim.current.buffer):
+            if line == '':
                 start_text += 1
-                if line == '':
-                    break
+                break
+            label, value = self.getMeta(line)
+            if self.meta_data_dict[label].startswith('blogit_'):
+                continue
+            if label in meta_data_f_dict:
+                value = meta_data_f_dict[label](value)
+            post[self.meta_data_dict[label]] = value
 
-            post = self.current_post.copy()
-            meta_data_f_dict = { 'Categories': split_comma,
-                                 'Date': date_from_meta }
-
-            for label, value in self.getMeta():
-                if self.meta_data_dict[label].startswith('blogit_'):
-                    continue
-                if label in meta_data_f_dict:
-                    value = meta_data_f_dict[label](value)
-                post[self.meta_data_dict[label]] = value
-
-            push_dict = { 0: 'draft', 1: 'publish',
-                          None: self.current_post['post_status'] }
-            post['post_status'] = push_dict[push]
-            if push is None:
-                push = 0
-
-            textl = self.getText(start_text)
+        post = self.current_post.copy()
+        meta_data_f_dict = { 'Categories': split_comma,
+                             'Date': date_from_meta }
+        push_dict = { 0: 'draft', 1: 'publish',
+                      None: self.current_post['post_status'] }
+        post['post_status'] = push_dict[push]
+        if push is None:
+            push = 0
+        try:
+            textl = self.getText(vim.current.buffer[start_text:])
+        except self.FilterException, e:
+            sys.stderr.write(e.message)
+        else:
             post['description'] = textl[0]
             if len(textl) > 1:
                 post['mt_text_more'] = textl[1]
-
+        try:
             postid = sendPost(post['postid'], post, push)
-            self.display_post(self.getPost(postid))
-        except self.FilterException, e:
-            sys.stderr.write(e.message)
         except Fault, e:
             sys.stderr.write(e.faultString)
+        else:
+            self.display_post(self.getPost(postid))
 
     def sendComments(self):
         """ Send changed and new comments to server.
@@ -1136,7 +1115,7 @@ class BlogIt(object):
             start_text += 1
             if line == '':
                 break
-        f.write(self.getText(start_text))
+        f.write(self.getText(vim.current.buffer[start_text:]))
         f.flush()
         f.close()
         webbrowser.open(self.prev_file)

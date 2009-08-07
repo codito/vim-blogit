@@ -189,23 +189,24 @@ class BlogIt(object):
 
     def __init__(self):
         self.client = None
-        self.__posts = {}
+        self._posts = {}
+        self.prev_file = None
 
     def connect(self):
         self.client = xmlrpclib.ServerProxy(self.blog_url)
 
-    def __get_current_data(self, page_type):
+    def _get_current_data(self, page_type):
         try:
-            t, data = self.__posts[vim.current.buffer.number]
+            t, data = self._posts[vim.current.buffer.number]
         except KeyError:
             return None
         else:
             if t != page_type:
                 raise self.BlogItException(
-                        'This buffer stores "%s".' % page_type)
+                        'This buffer stores "%s" not "%s".' % ( t, page_type ))
             return data
 
-    def __set_current_data(self, page_type, value):
+    def _set_current_data(self, page_type, value):
         """
         >>> vim.current.buffer.change_buffer(3)
         >>> blogit.current_post = { 'p3': 3 }
@@ -220,22 +221,30 @@ class BlogIt(object):
         >>> blogit.current_post
         {'p3': 3}
         """
-        self.__posts[vim.current.buffer.number] = ( page_type, value )
+        self._posts[vim.current.buffer.number] = ( page_type, value )
 
-    def __get_current_post(self):
-        return self.__get_current_data('post')
+    def _get_current_post(self):
+        return self._get_current_data('post')
 
-    def __set_current_post(self, value):
-        return self.__set_current_data('post', value)
+    def _set_current_post(self, value):
+        return self._set_current_data('post', value)
 
-    def __get_current_comments(self):
-        return self.__get_current_data('comments')
+    def _get_current_comments(self):
+        return self._get_current_data('comments')
 
-    def __set_current_comments(self, value):
-        return self.__set_current_data('comments', value)
+    def _set_current_comments(self, value):
+        return self._set_current_data('comments', value)
 
-    current_post = property(__get_current_post, __set_current_post)
-    current_comments = property(__get_current_comments, __set_current_comments)
+    @property
+    def current_post_type(self):
+        try:
+            t, data = self._posts[vim.current.buffer.number]
+        except KeyError:
+            return None
+        return t
+
+    current_post = property(_get_current_post, _set_current_post)
+    current_comments = property(_get_current_comments, _set_current_comments)
 
     meta_data_dict = { 'From': 'wp_author_display_name', 'Post-Id': 'postid',
             'Subject': 'title', 'Categories': 'categories',
@@ -345,7 +354,7 @@ class BlogIt(object):
         """
         Yields the lines of a post body.
         """
-        content = post_data.get(post_body, '').encode("utf-8")
+        content = post_data.get(post_body, '')
         if unformat:
             content = self.unformat(content)
         for line in content.split('\n'):
@@ -393,6 +402,7 @@ class BlogIt(object):
                          self.meta_data_dict['From']: self.blog_username }
         default_post.update(post)
         post = default_post
+        self.current_post = post
         meta_data_f_dict = { 'Date': self.DateTime_to_str,
                    'Categories': lambda L: ', '.join(L),
                    'Status': display_comment_count
@@ -809,6 +819,13 @@ class BlogIt(object):
             sys.stderr.write("Not editing a post.")
             return
         vim.command('set nomodified')
+
+        post = self.current_post.copy()
+        meta_data_f_dict = { 'Categories': split_comma,
+                             'Date': date_from_meta }
+        push_dict = { 0: 'draft', 1: 'publish',
+                      None: self.current_post['post_status'] }
+        post['post_status'] = push_dict[push]
         for start_text, line in enumerate(vim.current.buffer):
             if line == '':
                 start_text += 1
@@ -819,13 +836,6 @@ class BlogIt(object):
             if label in meta_data_f_dict:
                 value = meta_data_f_dict[label](value)
             post[self.meta_data_dict[label]] = value
-
-        post = self.current_post.copy()
-        meta_data_f_dict = { 'Categories': split_comma,
-                             'Date': date_from_meta }
-        push_dict = { 0: 'draft', 1: 'publish',
-                      None: self.current_post['post_status'] }
-        post['post_status'] = push_dict[push]
         if push is None:
             push = 0
         try:
@@ -1029,8 +1039,9 @@ class BlogIt(object):
     @vimcommand
     def command_this(self):
         """ make this a blog post """
-        if self.current_post is None:
-            self.display_post(new_text='\n'.join(vim.current.buffer[:]))
+        if self.current_post_type is None:
+            self.display_post(new_text='\n'.join(
+                [ line for line in vim.current.buffer[:] ]))
         else:
             sys.stderr.write("Already editing a post.")
 
@@ -1054,7 +1065,7 @@ class BlogIt(object):
     @vimcommand
     def command_commit(self):
         """ commit current post or comments """
-        if self.current_comments is not None:
+        if self.current_post_type == 'comments':
             self.sendComments()
         else:
             self.sendArticle()
@@ -1115,7 +1126,7 @@ class BlogIt(object):
             start_text += 1
             if line == '':
                 break
-        f.write(self.getText(vim.current.buffer[start_text:]))
+        f.write('<br/>'.join(self.getText(vim.current.buffer[start_text:])))
         f.flush()
         f.close()
         webbrowser.open(self.prev_file)

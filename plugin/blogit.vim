@@ -177,7 +177,10 @@ else:
 #####################
 
 class BlogIt(object):
-    class FilterException(Exception):
+    class BlogItException(Exception):
+        pass
+
+    class FilterException(BlogItException):
         def __init__(self, message, input_text, filter):
             self.message = "Blogit: Error happend while filtering with:" + \
                     filter + '\n' + message
@@ -197,10 +200,10 @@ class BlogIt(object):
         except KeyError:
             return None
         else:
-            if t == page_type:
-                return data
-            else:
-                return None
+            if t != page_type:
+                raise self.BlogItException(
+                        'This buffer stores "%s".' % page_type)
+            return data
 
     def __set_current_data(self, page_type, value):
         """
@@ -210,7 +213,10 @@ class BlogIt(object):
         >>> blogit.current_post
         >>> blogit.current_post = { 'p7': 42 }
         >>> vim.current.buffer.change_buffer(3)
-        >>> blogit.current_comments
+        >>> blogit.current_comments    #doctest: +ELLIPSIS
+        Traceback (most recent call last):
+        ...
+        BlogItException: This buffer stores "comments".
         >>> blogit.current_post
         {'p3': 3}
         """

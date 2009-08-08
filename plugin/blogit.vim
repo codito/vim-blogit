@@ -335,6 +335,18 @@ class BlogIt(object):
             meta_data_dict, meta_data_f_dict={}):
         """
         Returns a header line formated as it will be displayed to the user.
+
+        >>> blogit.format_header({}, 'A', {})
+        'A: '
+        >>> blogit.format_header({}, 'A', {'A': 'a'})
+        'A: '
+        >>> blogit.format_header({'b': 'two'}, 'A', {'A': 'a'})
+        'A: '
+        >>> blogit.format_header({'a': 'one', 'b': 'two'}, 'A', {'A': 'a'})
+        'A: one'
+        >>> blogit.format_header(
+        ...     {'a': 'onE'}, 'A', {'A': 'a'}, {'A': lambda x: x.swapcase()})
+        'A: ONe'
         """
         try:
             val = post_data[meta_data_dict[label]]
@@ -660,7 +672,6 @@ class BlogIt(object):
         self.append_post(comment, 'content', [ 'Status', 'Author',
                 'ID', 'Parent', 'Date', 'Type' ],
                 self.comments_meta_data_dict, meta_data_f_dict)
-        vim.current.buffer.append('')
         vim.current.buffer.append('')
         vim.current.buffer.append('')
         self.current_comments[str(comment['comment_id'])] = comment

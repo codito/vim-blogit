@@ -806,6 +806,16 @@ class BlogIt(object):
             raise self.FilterException(e.message, text, filter)
 
     def sendArticle(self, push=None):
+        """ Send current post to server.
+
+        >>> mock('sys.stderr')
+        >>> mock('xmlrpclib')
+        >>> mock('vim.command')
+        >>> blogit.sendArticle()
+        Called sys.stderr.write('Not editing a post.')
+        >>> minimock.restore()
+        >>> blogit.current_post = None
+        """
 
         def sendPost(postid, post, push):
             """ Unify newPost and editPost from the metaWeblog API. """
@@ -865,7 +875,7 @@ class BlogIt(object):
     def sendComments(self):
         """ Send changed and new comments to server.
 
-        >>> blogit.current_comment = { 'blog_id': 42 }
+        >>> blogit.current_comments = { 'blog_id': 42 }
         >>> mock('sys.stderr')
         >>> mock('blogit.getComments')
         >>> mock('blogit.changed_comments',
@@ -890,6 +900,7 @@ class BlogIt(object):
         Called sys.stderr.write('Server refuses update to 13.')
         Called blogit.getComments()
 
+        >>> vim.current.buffer.change_buffer()
         >>> minimock.restore()
 
         """

@@ -17,8 +17,8 @@
 " Maintainer:   Romain Bignon
 " Contributor:  Adam Schmalhofer
 " URL:          http://symlink.me/wiki/blogit
-" Version:      1.2
-" Last Change:  2009 July 18
+" Version:      1.3
+" Last Change:  2009 August 16
 "
 " Commands :
 " ":Blogit ls"
@@ -45,7 +45,7 @@
 "   Display help
 "
 " Note that preview might not word on all platforms. This is because we have
-" to rely on unsupported and non-portable functionality from the python 
+" to rely on unsupported and non-portable functionality from the python
 " standard library.
 "
 "
@@ -271,7 +271,7 @@ class BlogIt(object):
 
         >>> blogit.command_mockambiguous = f
         >>> blogit.command('mo')    #doctest: +NORMALIZE_WHITESPACE
-        Called sys.stderr.write('Ambiguious command mo: 
+        Called sys.stderr.write('Ambiguious command mo:
                 mockambiguous, mocktest.')
 
         >>> minimock.restore()

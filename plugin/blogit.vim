@@ -1058,7 +1058,7 @@ class BlogIt(object):
         for p in posts:
             yield format % ( int(p['postid']),
                     self.DateTime_to_str(p['date_created_gmt'], '%x'),
-                    p['title'].encode('utf-8') )
+                    p['title'] )
 
     @vimcommand
     def command_ls(self):
@@ -1071,7 +1071,8 @@ class BlogIt(object):
                 return
             vim.command('botright new')
             self.current_post = None
-            vim.current.buffer[:] = list(self.post_table(allposts))
+            vim.current.buffer[:] = [ line.encode('utf-8')
+                                      for line in self.post_table(allposts) ]
             vim.command('setlocal buftype=nofile bufhidden=wipe nobuflisted ' +
                     'noswapfile syntax=blogsyntax nomodifiable nowrap')
             vim.current.window.cursor = (2, 0)

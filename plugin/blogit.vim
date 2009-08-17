@@ -151,6 +151,7 @@ python <<EOF
 # Lets the python unit test ignore eveything above this line (docstring). """
 import xmlrpclib, sys, re
 from time import mktime, strptime, strftime, localtime, gmtime
+from locale import getpreferredencoding
 from calendar import timegm
 from subprocess import Popen, CalledProcessError, PIPE
 from xmlrpclib import DateTime, Fault, MultiCall
@@ -455,14 +456,15 @@ class BlogIt(object):
         """
         >>> BlogIt.DateTime_to_str(DateTime('20090628T17:38:58'),
         ...         '%a %b %d %H:%M:%S %Y')
-        'Sun Jun 28 19:38:58 2009'
+        u'Sun Jun 28 19:38:58 2009'
 
         >>> BlogIt.DateTime_to_str('invalid input')
         ''
         """
         try:
-            return strftime(format, localtime(timegm(strptime(str(date),
-                                              '%Y%m%dT%H:%M:%S'))))
+            return unicode(strftime(format,
+                    localtime(timegm(strptime(str(date), '%Y%m%dT%H:%M:%S')))),
+                    getpreferredencoding(), 'ignore')
         except ValueError:
             return ''
 
@@ -1035,7 +1037,7 @@ class BlogIt(object):
         ...     'date_created_gmt': DateTime('20090628T17:38:58'),
         ...     'title': 'A title'} ]))    #doctest: +NORMALIZE_WHITESPACE
         ['ID    Date        Title',
-         ' 1    06/28/09    A title']
+        u' 1    06/28/09    A title']
         >>> list(blogit.post_table([{'postid': id,
         ...     'date_created_gmt': DateTime(d), 'title': t}
         ...     for id, d, t in zip(( '7', '42' ),
@@ -1043,8 +1045,8 @@ class BlogIt(object):
         ...         ( 'First Title', 'Second Title' )
         ...     )]))     #doctest: +NORMALIZE_WHITESPACE
         ['ID    Date        Title',
-         ' 7    06/28/09    First Title',
-         '42    06/28/10    Second Title']
+        u' 7    06/28/09    First Title',
+        u'42    06/28/10    Second Title']
 
         """
         assert posts is not None

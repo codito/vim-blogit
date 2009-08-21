@@ -142,8 +142,11 @@ function! CommentsFoldText()
         while getline(line_no) !~ '^\s*$'
             let line_no += 1
         endwhile
+        let title = getline(line_no + 1)
+    else
+        let title = substitute(getline(line_no + 1), '^ *', '', '')
     endif
-    return '+' . v:folddashes . getline(line_no + 1)
+    return '+' . v:folddashes . title
 endfunction
 
 python <<EOF

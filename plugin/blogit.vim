@@ -674,6 +674,11 @@ class BlogIt(object):
                      meta_data_f_dict, headers, post_body)
             self.empty_comment_list()
 
+        def init_vim_buffer(self):
+            super(WordPressCommentList, self).init_vim_buffer()
+            vim.command('setlocal linebreak completefunc=BlogitComplete ' +
+                               'foldmethod=marker foldtext=CommentsFoldText()')
+
         def empty_comment_list(self):
             self.comment_list = {}
             self.comments_by_category = {}
@@ -901,16 +906,11 @@ class BlogIt(object):
 
             >>> mock('xmlrpclib.MultiCall', returns=Mock(
             ...         'multicall', returns=[], tracker=None))
-            >>> mock('vim.command')
             >>> c = BlogIt.WordPressCommentList(42)
             >>> mock('c.display', returns=[])
             >>> mock('c.changed_comments', returns=[])
             >>> c.getComments()   #doctest: +NORMALIZE_WHITESPACE
             Called xmlrpclib.MultiCall(<ServerProxy for example.com/RPC2>)
-            Called vim.command(
-                'setlocal nomodified linebreak
-                          foldmethod=marker foldtext=CommentsFoldText()
-                          completefunc=BlogitComplete')
             Called c.display()
             Called c.changed_comments([])
 
@@ -927,9 +927,6 @@ class BlogIt(object):
                     ( 'In Moderadation', 'Spam', 'Published' )):
                 for comment_dict in comments:
                     self.add_comment(heading, comment_dict)
-            vim.command('setlocal nomodified linebreak ' +
-                'foldmethod=marker foldtext=CommentsFoldText() ' +
-                'completefunc=BlogitComplete')
             if list(self.changed_comments(self.display())) != []:
                 sys.stderr.write('Bug in BlogIt: Deactivating comment editing:\n')
                 for d in self.changed_comments():

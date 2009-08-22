@@ -120,8 +120,13 @@ function! BlogitComplete(findstart, base)
         elseif getline('.') =~# '^Tags: '
             let L = s:used_tags
         elseif getline('.') =~# '^Status: '
-            " for comments
-            let L = [ 'approve', 'spam', 'hold', 'new', 'rm' ]
+            if getline(0) =~# '^=============================================='
+                " for comments
+                let L = [ 'approve', 'spam', 'hold', 'new', 'rm' ]
+            else
+                " for blogposts
+                let L = [ 'draft', 'publish', 'private', 'pending', 'new', 'rm' ]
+            endif
             let sep = ''
         else
             return []
@@ -332,7 +337,7 @@ class BlogIt(object):
             >>> blogit.AbstractPost().format_header('A')
             'A: '
             >>> blogit.AbstractPost(meta_data_dict={'A': 'a'}
-            ...     ).format_header('A')
+            ...                    ).format_header('A')
             'A: '
             >>> blogit.AbstractPost(post_data={'b': 'two'},
             ...     meta_data_dict={'A': 'a'}).format_header('A')

@@ -256,10 +256,7 @@ class BlogIt(object):
         def client(self):
             return xmlrpclib.ServerProxy(self.vim_vars.blog_url)
 
-        def read_post(self, *a, **d):
-            raise BlogIt.NoPostException
-
-        def send(self, *a, **d):
+        def __getattr__(self, name):
             raise BlogIt.NoPostException
 
 

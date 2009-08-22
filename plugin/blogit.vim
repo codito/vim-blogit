@@ -272,6 +272,14 @@ class BlogIt(object):
             self.HEADERS = headers
             self.POST_BODY = post_body
 
+        def refresh_vim_buffer(self):
+            vim.current.buffer[:] = [ unicode(line, 'utf-8').encode('utf-8')
+                                         for line in self.display() ]
+            vim.command('setlocal nomodified')
+
+        def init_vim_buffer(self):
+            self.refresh_vim_buffer()
+
         def read_header(self, line):
             """ XXX: Previously called getMeta().
             Reads the meta-data in the current buffer. Outputed as dictionary.
@@ -396,7 +404,7 @@ class BlogIt(object):
             return b
 
         def init_vim_buffer(self):
-            BlogIt.display(self)
+            super(BlogIt.BlogPost, self).init_vim_buffer()
             vim.command('nnoremap <buffer> gf :py blogit.list_comments()<cr>')
             vim.command('setlocal nomodified ft=mail textwidth=0 ' +
                                  'completefunc=BlogitComplete')
@@ -1009,7 +1017,7 @@ class BlogIt(object):
             vim.command('enew')
             p.getComments()
             self.current_post = p
-            self.display(p)
+            p.init_vim_buffer()
 
     def list_edit(self):
         """
@@ -1156,12 +1164,6 @@ class BlogIt(object):
                     self.DateTime_to_str(p['date_created_gmt'], '%x'),
                     p['title'] )
 
-    @staticmethod
-    def display(post):
-        vim.current.buffer[:] = [ unicode(line, 'utf-8').encode('utf-8')
-                                     for line in post.display() ]
-        vim.command('setlocal nomodified')
-
     @vimcommand
     def command_ls(self):
         """ list all posts """
@@ -1223,21 +1225,21 @@ class BlogIt(object):
         """ commit current post or comments """
         p = self.current_post
         p.send(vim.current.buffer[:])
-        self.display(p)
+        p.refresh_vim_buffer()
 
     @vimcommand
     def command_push(self):
         """ publish post """
         p = self.current_post
         p.send(vim.current.buffer[:], push=1)
-        self.display(p)
+        p.refresh_vim_buffer()
 
     @vimcommand
     def command_unpush(self):
         """ unpublish post """
         p = self.current_post
         p.send(vim.current.buffer[:], push=1)
-        self.display(p)
+        p.refresh_vim_buffer()
 
     @vimcommand
     def command_rm(self, id):

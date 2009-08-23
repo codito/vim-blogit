@@ -150,7 +150,6 @@ function! CommentsFoldText()
 endfunction
 
 python <<EOF
-# -*- coding: utf-8 -*-
 # Lets the python unit test ignore eveything above this line (docstring). """
 import xmlrpclib, sys, re
 from time import mktime, strptime, strftime, localtime, gmtime
@@ -181,6 +180,10 @@ class BlogIt(object):
 
 
     class NoPostException(BlogItException):
+        pass
+
+
+    class BlogItBug(BlogItException):
         pass
 
 
@@ -270,11 +273,16 @@ class BlogIt(object):
             self.POST_BODY = post_body
 
         def refresh_vim_buffer(self):
-            vim.current.buffer[:] = [ unicode(line, 'utf-8').encode('utf-8')
-                                         for line in self.display() ]
+            def enc(text):
+                try:
+                    return text.encode('utf-8')
+                except UnicodeDecodeError:
+                    return text
+            vim.current.buffer[:] = [ enc(line) for line in self.display() ]
             vim.command('setlocal nomodified')
 
         def init_vim_buffer(self):
+            vim.command('setlocal encoding=utf-8')
             self.refresh_vim_buffer()
 
         def read_header(self, line):
@@ -298,7 +306,7 @@ class BlogIt(object):
 
             >>> BlogIt.AbstractPost(post_body='content').read_post(
             ...         [ 'Tag:  Value  ', '', 'Some Text', 'in two lines.' ])
-            {'content': 'Some Text\nin two lines.', 'Tag': 'Value'}
+            {'content': 'Some Text\nin two lines.', 'Tag': u'Value'}
             """
             d = {self.POST_BODY: ''}
             for i, line in enumerate(lines):
@@ -307,7 +315,7 @@ class BlogIt(object):
                     break
                 t, v = self.read_header(line)
                 if not t.startswith('blogit_'):
-                    d[t] = v.strip()
+                    d[t] = unicode(v.strip(), 'utf-8')
             return d
 
         def display(self):
@@ -403,7 +411,7 @@ class BlogIt(object):
         def init_vim_buffer(self):
             super(BlogIt.BlogPost, self).init_vim_buffer()
             vim.command('nnoremap <buffer> gf :py blogit.list_comments()<cr>')
-            vim.command('setlocal nomodified ft=mail textwidth=0 ' +
+            vim.command('setlocal ft=mail textwidth=0 ' +
                                  'completefunc=BlogitComplete')
             vim.current.window.cursor = (8, 0)
 
@@ -672,7 +680,7 @@ class BlogIt(object):
             self.empty_comment_list()
 
         def init_vim_buffer(self):
-            super(WordPressCommentList, self).init_vim_buffer()
+            super(BlogIt.CommentList, self).init_vim_buffer()
             vim.command('setlocal linebreak completefunc=BlogitComplete ' +
                                'foldmethod=marker foldtext=CommentsFoldText()')
 
@@ -777,12 +785,12 @@ class BlogIt(object):
             ...             'Same Text',
             ...     60 * '=', 'ID: 3', 'Status: spam', '', 'Same Again',
             ... ]))      #doctest: +NORMALIZE_WHITESPACE
-            [{'content': 'Changed Text', 'status': 'hold', 'comment_id': '1',
+            [{'content': 'Changed Text', 'status': u'hold', 'comment_id': '1',
               'unknown': 'tag'},
-             {'status': 'hold', 'content': 'New Text', 'parent': '0',
+             {'status': u'hold', 'content': 'New Text', 'parent': '0',
               'author': '', 'type': '', 'comment_id': '',
               'date_created_gmt': ''},
-             {'content': 'Same Again', 'status': 'spam', 'comment_id': '3'}]
+             {'content': 'Same Again', 'status': u'spam', 'comment_id': '3'}]
             """
             ignored_tags = set([ 'ID', 'Date' ])
 
@@ -805,18 +813,18 @@ class BlogIt(object):
             ...     60 * '=',
             ...     'Tag:  Value  ', '', 'Some Text', 'in two lines.   ',
             ... ]))    #doctest: +NORMALIZE_WHITESPACE
-            [{'content': '', 'Tag2': 'Val2'},
-             {'content': 'Some Text\nin two lines.', 'Tag': 'Value'}]
+            [{'content': '', 'Tag2': u'Val2'},
+             {'content': 'Some Text\nin two lines.', 'Tag': u'Value'}]
             >>> list(BlogIt.CommentList().read_post([
             ...     60 * '=', 'ID: 1 ', 'Status: hold', '', 'Text',
             ...     60 * '=', 'ID:  ', 'Status: hold', '', 'Text',
             ...     60 * '=', 'ID: 2', 'Status: hold', 'Date: new', '', 'Text',
             ...     60 * '=', 'ID: 3', 'Status: spam', '', 'Text',
             ... ]))      #doctest: +NORMALIZE_WHITESPACE
-            [{'content': 'Text', 'Status': 'hold', 'ID': '1'},
-             {'content': 'Text', 'Status': 'hold', 'ID': ''},
-             {'content': 'Text', 'Status': 'hold', 'ID': '2', 'Date': 'new'},
-             {'content': 'Text', 'Status': 'spam', 'ID': '3'}]
+            [{'content': 'Text', 'Status': u'hold', 'ID': u'1'},
+             {'content': 'Text', 'Status': u'hold', 'ID': u''},
+             {'content': 'Text', 'Status': u'hold', 'ID': u'2', 'Date': u'new'},
+             {'content': 'Text', 'Status': u'spam', 'ID': u'3'}]
             """
             j = 0
             lines = list(lines)
@@ -925,12 +933,11 @@ class BlogIt(object):
                 for comment_dict in comments:
                     self.add_comment(heading, comment_dict)
             if list(self.changed_comments(self.display())) != []:
-                sys.stderr.write('Bug in BlogIt: Deactivating comment editing:\n')
-                for d in self.changed_comments():
-                    sys.stderr.write('  %s' % d['comment_id'])
-                    #print list(self.changed_comments())
-                vim.command('setlocal nomodifiable')
-                self.current_comments = None
+                msg = 'Bug in BlogIt: Deactivating comment editing:\n'
+                for d in self.changed_comments(self.display()):
+                    msg += '  %s' % d['comment_id']
+                    #msg += str(list(self.changed_comments()))
+                raise BlogIt.BlogItBug(msg)
 
 
     def __init__(self):
@@ -1009,9 +1016,15 @@ class BlogIt(object):
         if vim.current.line.startswith('Status: '):
             p = BlogIt.WordPressCommentList(self.current_post.BLOG_POST_ID)
             vim.command('enew')
-            p.getComments()
-            self.current_post = p
-            p.init_vim_buffer()
+            try:
+                p.getComments()
+            except BlogIt.BlogItBug, e:
+                p.init_vim_buffer()
+                vim.command('setlocal nomodifiable')
+                sys.stderr.write(e.msg)
+            else:
+                self.current_post = p
+                p.init_vim_buffer()
 
     def list_edit(self):
         """

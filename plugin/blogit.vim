@@ -268,6 +268,39 @@ class BlogIt(object):
             raise BlogIt.NoPostException
 
 
+    class PostTable(object):
+        @classmethod
+        def post_table(self, posts):
+            """ Yields the rows of a table displaying the posts (at least one).
+
+            >>> list(BlogIt.PostTable.post_table([ {'postid': '1',
+            ...     'date_created_gmt': DateTime('20090628T17:38:58'),
+            ...     'title': 'A title'} ]))    #doctest: +NORMALIZE_WHITESPACE
+            ['ID    Date        Title',
+            u' 1    06/28/09    A title']
+            >>> list(BlogIt.PostTable.post_table([{'postid': id,
+            ...     'date_created_gmt': DateTime(d), 'title': t}
+            ...     for id, d, t in zip(( '7', '42' ),
+            ...         ( '20090628T17:38:58', '20100628T17:38:58' ),
+            ...         ( 'First Title', 'Second Title' )
+            ...     )]))     #doctest: +NORMALIZE_WHITESPACE
+            ['ID    Date        Title',
+            u' 7    06/28/09    First Title',
+            u'42    06/28/10    Second Title']
+
+            """
+            assert posts is not None
+            yield "%sID    Date%sTitle" % \
+                    ( ' ' * ( len(posts[0]['postid']) - 2 ),
+                    ( ' ' * len(BlogIt.DateTime_to_str(
+                    posts[0]['date_created_gmt'], '%x')) ) )
+            format = '%%%dd    %%s    %%s' % max(2, len(posts[0]['postid']))
+            for p in posts:
+                yield format % ( int(p['postid']),
+                        BlogIt.DateTime_to_str(p['date_created_gmt'], '%x'),
+                        p['title'] )
+
+
     class AbstractPost(object):
         def __init__(self, post_data={}, meta_data_dict={},
                      meta_data_f_dict={}, headers=[], post_body=''):
@@ -1146,36 +1179,6 @@ class BlogIt(object):
         register_to.append('%-25s %s\n' % ( command, f.__doc__ ))
         return f
 
-    def post_table(self, posts):
-        """ Yields the rows of a table displaying the posts (at least one).
-
-        >>> list(blogit.post_table([ {'postid': '1',
-        ...     'date_created_gmt': DateTime('20090628T17:38:58'),
-        ...     'title': 'A title'} ]))    #doctest: +NORMALIZE_WHITESPACE
-        ['ID    Date        Title',
-        u' 1    06/28/09    A title']
-        >>> list(blogit.post_table([{'postid': id,
-        ...     'date_created_gmt': DateTime(d), 'title': t}
-        ...     for id, d, t in zip(( '7', '42' ),
-        ...         ( '20090628T17:38:58', '20100628T17:38:58' ),
-        ...         ( 'First Title', 'Second Title' )
-        ...     )]))     #doctest: +NORMALIZE_WHITESPACE
-        ['ID    Date        Title',
-        u' 7    06/28/09    First Title',
-        u'42    06/28/10    Second Title']
-
-        """
-        assert posts is not None
-        yield "%sID    Date%sTitle" % \
-                ( ' ' * ( len(posts[0]['postid']) - 2 ),
-                ( ' ' * len(self.DateTime_to_str(
-                posts[0]['date_created_gmt'], '%x')) ) )
-        format = '%%%dd    %%s    %%s' % max(2, len(posts[0]['postid']))
-        for p in posts:
-            yield format % ( int(p['postid']),
-                    self.DateTime_to_str(p['date_created_gmt'], '%x'),
-                    p['title'] )
-
     @vimcommand
     def command_ls(self):
         """ list all posts """
@@ -1188,8 +1191,8 @@ class BlogIt(object):
                 return
             vim.command('botright new')
             self.current_post = None
-            vim.current.buffer[:] = [ line.encode('utf-8')
-                                      for line in self.post_table(allposts) ]
+            vim.current.buffer[:] = [ line.encode('utf-8') for line in
+                                        BlogIt.PostTable.post_table(allposts) ]
             vim.command('setlocal buftype=nofile bufhidden=wipe nobuflisted ' +
                     'noswapfile syntax=blogsyntax nomodifiable nowrap')
             vim.current.window.cursor = (2, 0)

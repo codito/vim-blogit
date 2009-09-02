@@ -752,9 +752,14 @@ class BlogIt(object):
 
     class CommentList(Comment):
         def __init__(self, meta_data_dict=None,
-                     meta_data_f_dict=None, headers=None, post_body='content'):
+                     meta_data_f_dict=None, headers=None, post_body='content',
+                     comment_categories=None):
             super(BlogIt.CommentList, self).__init__({}, meta_data_dict,
                      meta_data_f_dict, headers, post_body)
+            if comment_categories is None:
+                comment_categories = ( 'New', 'In Moderadation', 'Spam',
+                                       'Published' )
+            self.comment_categories = comment_categories
             self.empty_comment_list()
 
         def init_vim_buffer(self):
@@ -765,7 +770,7 @@ class BlogIt(object):
         def empty_comment_list(self):
             self.comment_list = {}
             self.comments_by_category = {}
-            self.add_comment('new', {'status': 'new', 'author': '',
+            self.add_comment('New', {'status': 'new', 'author': '',
                                      'comment_id': '', 'parent': '0',
                                      'date_created_gmt': '', 'type': '',
                                      'content': ''
@@ -788,7 +793,7 @@ class BlogIt(object):
             >>> [ (cat, [ c.post_data['comment_id'] for c in L ])
             ...         for cat, L in cl.comments_by_category.iteritems()
             ... ]    #doctest: +NORMALIZE_WHITESPACE
-            [('new', ['']), ('hold', ['1'])]
+            [('New', ['']), ('hold', ['1'])]
             >>> cl.add_comment('spam', {'comment_id': '1'}
             ...               )    #doctest: +ELLIPSIS
             Traceback (most recent call last):
@@ -808,7 +813,6 @@ class BlogIt(object):
 
         def display(self):
             """
-            # XXX regression: Order of different statuses.
 
             >>> list(BlogIt.CommentList().display())    #doctest: +NORMALIZE_WHITESPACE
             ['======================================================================== {{{1',
@@ -824,8 +828,10 @@ class BlogIt(object):
              '',
              '']
             """
-            for heading, comments in self.comments_by_category.iteritems():
-                if comments == []:
+            for heading in self.comment_categories:
+                try:
+                    comments = self.comments_by_category[heading]
+                except KeyError:
                     continue
 
                 yield 72 * '=' + ' {{{1'
@@ -916,9 +922,10 @@ class BlogIt(object):
     class WordPressCommentList(CommentList):
         def __init__(self, blog_post_id, meta_data_dict=None,
                      meta_data_f_dict=None, headers=None, post_body='content',
-                     vim_vars=None, client=None):
+                     vim_vars=None, client=None, comment_categories=None):
             super(BlogIt.WordPressCommentList, self).__init__(
-                    meta_data_dict, meta_data_f_dict, headers, post_body)
+                    meta_data_dict, meta_data_f_dict, headers, post_body,
+                    comment_categories)
             if vim_vars is None:
                 vim_vars = BlogIt.VimVars()
             self.vim_vars = vim_vars

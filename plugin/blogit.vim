@@ -173,7 +173,7 @@ except ImportError:
     import minimock, doctest
     from mock_vim import vim
 else:
-    doctest = False
+    doctest = None
 
 #####################
 # Do not edit below #
@@ -1351,5 +1351,5 @@ class BlogIt(object):
 
 blogit = BlogIt()
 
-if doctest:
+if doctest is not None:
     doctest.testmod()

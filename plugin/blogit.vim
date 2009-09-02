@@ -439,7 +439,7 @@ class BlogIt(object):
             return '\n'.join(lines).strip()
 
         def read_post(self, lines):
-            r""" Yields a dict for each comment in the current buffer.
+            r""" Returns the dict from given text of the post.
 
             >>> BlogIt.AbstractPost(post_body='content').read_post(
             ...         [ 'Tag:  Value  ', '', 'Some Text', 'in two lines.' ])
@@ -582,6 +582,14 @@ class BlogIt(object):
             text = super(BlogIt.BlogPost, self).read_body(lines)
             return map(self.format, text.split('\n<!--more-->\n\n'))
 
+        def read_post(self, lines):
+            d = super(BlogIt.BlogPost, self).read_post(lines)
+            body = d[self.POST_BODY]
+            d[self.POST_BODY] = body[0]
+            if len(body) == 2:
+                d['mt_text_more'] = body[1]
+            return d
+
         def unformat(self, text):
             r"""
             >>> mock('vim.mocked_eval', returns_iter=[ '1', 'false' ])
@@ -704,9 +712,11 @@ class BlogIt(object):
             >>> p = BlogIt.WordPressBlogPost(42,
             ...         {'post_status': 'new', 'postid': 42})
             >>> mock('p.client'); mock('p.getPost'); mock('p.display')
-            >>> p.send([])    #doctest: +NORMALIZE_WHITESPACE
+            >>> mock('vim.mocked_eval', tracker=None)
+            >>> p.send(['', 'text'])    #doctest: +NORMALIZE_WHITESPACE
             Called p.client.metaWeblog.editPost( 42, 'user', 'password',
-                    {'post_status': 'new', 'postid': 42, 'description': ''}, 0)
+                    {'post_status': 'new', 'postid': 42,
+                     'description': 'text'}, 0)
             Called p.getPost()
             >>> minimock.restore()
             """
@@ -1395,7 +1405,7 @@ class BlogIt(object):
     def command_preview(self):
         """ preview current post locally """
         p = self.current_post
-        if instanceof(p, CommentList):
+        if isinstance(p, BlogIt.CommentList):
             raise Blogit.NoPostException
         if self.prev_file is None:
             self.prev_file = tempfile.mkstemp('.html', 'blogit')[1]

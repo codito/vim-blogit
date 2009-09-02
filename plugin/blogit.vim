@@ -291,7 +291,7 @@ class BlogIt(object):
 
 
     class PostTable(AbstractBufferIO):
-        def __init__(self, vim_vars=None, client=None):
+        def __init__(self, vim_vars=None, client=None, row_types=None):
             if vim_vars is None:
                 vim_vars = BlogIt.VimVars()
             self.vim_vars = vim_vars
@@ -299,6 +299,10 @@ class BlogIt(object):
                 client = xmlrpclib.ServerProxy(self.vim_vars.blog_url)
             self.client = client
             self.post_data = None
+            if row_types is None:
+                row_types = ( BlogIt.MetaWeblogPostTablePosts,
+                              BlogIt.WordPressPostTablePages )
+            self.row_groups = [ group(vim_vars) for group in row_types ]
 
         @classmethod
         def create_new_post(cls, body_lines=['']):
@@ -319,13 +323,17 @@ class BlogIt(object):
             """ Yields the rows of a table displaying the posts (at least one).
 
             >>> p = BlogIt.PostTable()
-            >>> p.post_data = [ {'postid': '1',
+            >>> p.display().next()       #doctest: +ELLIPSIS
+            Traceback (most recent call last):
+              [...]
+            PostTableEmptyException
+            >>> p.row_groups[0].post_data = [ {'postid': '1',
             ...     'date_created_gmt': DateTime('20090628T17:38:58'),
             ...     'title': 'A title'} ]
             >>> list(p.display())    #doctest: +NORMALIZE_WHITESPACE
             ['ID    Date        Title',
             u' 1    06/28/09    A title']
-            >>> p.post_data = [{'postid': id,
+            >>> p.row_groups[0].post_data = [{'postid': id,
             ...     'date_created_gmt': DateTime(d), 'title': t}
             ...     for id, d, t in zip(( '7', '42' ),
             ...         ( '20090628T17:38:58', '20100628T17:38:58' ),
@@ -337,21 +345,72 @@ class BlogIt(object):
             u'42    06/28/10    Second Title']
 
             """
-            if self.post_data is None:
+            for row_group in self.row_groups:
+                if not row_group.is_empty:
+                    break
+            else:
                 raise BlogIt.PostTableEmptyException
-            yield "%sID    Date%sTitle" % \
-                    ( ' ' * ( len(self.post_data[0]['postid']) - 2 ),
-                    ( ' ' * len(BlogIt.DateTime_to_str(
-                    self.post_data[0]['date_created_gmt'], '%x')) ) )
-            format = '%%%dd    %%s    %%s' % max(2,
-                                              len(self.post_data[0]['postid']))
-            for p in self.post_data:
-                yield format % ( int(p['postid']),
-                        BlogIt.DateTime_to_str(p['date_created_gmt'], '%x'),
-                        p['title'] )
+            id_column_width = max(2, *[ p.min_id_column_width
+                                            for p in self.row_groups ])
+            yield "%sID    Date%sTitle" % ( ' ' * ( id_column_width - 2 ),
+                    ' ' * len(BlogIt.DateTime_to_str(DateTime(), '%x')) )
+            format = '%%%dd    %%s    %%s' % id_column_width
+            for row_group in self.row_groups:
+                for post_id, date, title in row_group.rows_data():
+                    yield format % ( int(post_id),
+                                     BlogIt.DateTime_to_str(date, '%x'),
+                                     title )
 
         def getPost(self):
-            self.post_data = self.client.metaWeblog.getRecentPosts('',
+            multicall = xmlrpclib.MultiCall(self.client)
+            for row_group in self.row_groups:
+                row_group.xmlrpc_call__getPost(multicall)
+            for row_group, response in zip(self.row_groups, multicall()):
+                row_group.getPost(response)
+
+
+    class AbstractPostTableSource(object):
+        def __init__(self, id_date_title_tags, vim_vars):
+            self.id_date_title_tags = id_date_title_tags
+            self.vim_vars = vim_vars
+            self.post_data = []
+
+        def getPost(self, server_response):
+            self.post_data = server_response
+
+        @property
+        def is_empty(self):
+            return len(self.post_data) == 0
+
+        @property
+        def min_id_column_width(self):
+            return max(-1, -1,    # Work-around max(-1, *[]) not-iterable.
+                       *[ len(str(p[self.id_date_title_tags[0]]))
+                                for p in self.post_data ])
+
+        def rows_data(self):
+            post_id, date, title = self.id_date_title_tags
+            for p in self.post_data:
+                yield ( p[post_id], p[date], p[title] )
+
+
+    class MetaWeblogPostTablePosts(AbstractPostTableSource):
+        def __init__(self, vim_vars):
+            super(BlogIt.MetaWeblogPostTablePosts, self).__init__(
+                ( 'postid', 'date_created_gmt', 'title' ), vim_vars )
+
+        def xmlrpc_call__getPost(self, multicall):
+            multicall.metaWeblog.getRecentPosts('',
+                    self.vim_vars.blog_username, self.vim_vars.blog_password)
+
+
+    class WordPressPostTablePages(AbstractPostTableSource):
+        def __init__(self, vim_vars):
+            super(BlogIt.WordPressPostTablePages, self).__init__(
+                ( 'page_id', 'dateCreated', 'page_title' ), vim_vars )
+
+        def xmlrpc_call__getPost(self, multicall):
+            multicall.wp.getPageList('',
                     self.vim_vars.blog_username, self.vim_vars.blog_password)
 
 

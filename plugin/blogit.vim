@@ -989,6 +989,11 @@ class BlogIt(object):
                     sys.stderr.write('Server refuses update to %s.' % comment_id)
             return self.getComments()
 
+        def _no_send(self, lines=[], push=None):
+            """ Replace send() with this to prevent the user from commiting.
+            """
+            raise BlogIt.NoPostException
+
         def getComments(self, offset=0):
             """ Lists the comments to a post with given id in a new buffer.
 
@@ -1020,6 +1025,7 @@ class BlogIt(object):
                 for d in self.changed_comments(self.display()):
                     msg += '  %s' % d['comment_id']
                     #msg += str(list(self.changed_comments()))
+                self.send = self._no_send
                 raise BlogIt.BlogItBug(msg)
 
 
@@ -1099,6 +1105,7 @@ class BlogIt(object):
         if vim.current.line.startswith('Status: '):
             p = BlogIt.WordPressCommentList(self.current_post.BLOG_POST_ID)
             vim.command('enew')
+            self.current_post = p
             try:
                 p.getComments()
             except BlogIt.BlogItBug, e:
@@ -1106,7 +1113,6 @@ class BlogIt(object):
                 vim.command('setlocal nomodifiable')
                 sys.stderr.write(e.msg)
             else:
-                self.current_post = p
                 p.init_vim_buffer()
 
     def list_edit(self):

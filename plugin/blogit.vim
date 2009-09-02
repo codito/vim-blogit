@@ -1165,6 +1165,8 @@ class BlogIt(object):
                             (command, int(str(e).split(' ')[3]) - 1))
                 except:
                     sys.stderr.write('%s' % e)
+            except Exception, e:
+                sys.stderr.write(e.message)
         else:
             sys.stderr.write("Ambiguious command %s: %s." % ( command,
                     ', '.join([ s.replace('command_', '', 1)

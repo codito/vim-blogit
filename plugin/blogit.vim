@@ -666,7 +666,11 @@ class BlogIt(object):
                 return text
             try:
                 p = Popen(filter, shell=True, stdin=PIPE, stdout=PIPE, stderr=PIPE)
-                p.stdin.write(text.encode(getpreferredencoding()))
+                try:
+                    p.stdin.write(text.encode(getpreferredencoding()))
+                except UnicodeDecodeError:
+                    p.stdin.write(text.decode('utf-8'
+                                             ).encode(getpreferredencoding()))
                 p.stdin.close()
                 if p.wait():
                     raise BlogIt.FilterException(p.stderr.read(), text, filter)

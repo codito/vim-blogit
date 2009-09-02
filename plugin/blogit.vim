@@ -317,7 +317,6 @@ class BlogIt(object):
 
         def display(self):
             """ Yields the rows of a table displaying the posts (at least one).
-            # XXX was: post_table.
 
             >>> p = BlogIt.PostTable()
             >>> p.post_data = [ {'postid': '1',
@@ -366,8 +365,9 @@ class BlogIt(object):
             self.POST_BODY = post_body
 
         def read_header(self, line):
-            """ XXX: Previously called getMeta().
-            Reads the meta-data in the current buffer. Outputed as dictionary.
+            """ Reads the meta-data in the current buffer.
+
+            Outputed as dictionary.
 
             >>> blogit.AbstractPost().read_header('tag: value')
             ('tag', 'value')
@@ -377,12 +377,10 @@ class BlogIt(object):
             return m.group(1, 2)
 
         def read_body(self, lines):
-            """ XXX: Previously called getText(). """
             return '\n'.join(lines).strip()
 
         def read_post(self, lines):
-            r""" XXX: Previously called read_comments().
-            Yields a dict for each comment in the current buffer.
+            r""" Yields a dict for each comment in the current buffer.
 
             >>> BlogIt.AbstractPost(post_body='content').read_post(
             ...         [ 'Tag:  Value  ', '', 'Some Text', 'in two lines.' ])
@@ -810,7 +808,6 @@ class BlogIt(object):
 
         def display(self):
             """
-            # was: append_comment_to_buffer()
             # XXX regression: Order of different statuses.
 
             >>> list(BlogIt.CommentList().display())    #doctest: +NORMALIZE_WHITESPACE
@@ -885,8 +882,7 @@ class BlogIt(object):
                     yield updated_comment
 
         def read_post(self, lines):
-            r""" XXX: Previously call read_comments().
-            Yields a dict for each comment in the current buffer.
+            r""" Yields a dict for each comment in the current buffer.
 
             >>> list(BlogIt.CommentList().read_post([
             ...     60 * '=', 'Tag2: Val2 ', '',

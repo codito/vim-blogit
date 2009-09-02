@@ -192,6 +192,10 @@ class BlogIt(object):
         pass
 
 
+    class PostTableEmptyException(BlogItException):
+        pass
+
+
     class FilterException(BlogItException):
         def __init__(self, message, input_text, filter):
             self.message = "Blogit: Error happend while filtering with:" + \
@@ -268,48 +272,7 @@ class BlogIt(object):
             raise BlogIt.NoPostException
 
 
-    class PostTable(object):
-        @classmethod
-        def post_table(self, posts):
-            """ Yields the rows of a table displaying the posts (at least one).
-
-            >>> list(BlogIt.PostTable.post_table([ {'postid': '1',
-            ...     'date_created_gmt': DateTime('20090628T17:38:58'),
-            ...     'title': 'A title'} ]))    #doctest: +NORMALIZE_WHITESPACE
-            ['ID    Date        Title',
-            u' 1    06/28/09    A title']
-            >>> list(BlogIt.PostTable.post_table([{'postid': id,
-            ...     'date_created_gmt': DateTime(d), 'title': t}
-            ...     for id, d, t in zip(( '7', '42' ),
-            ...         ( '20090628T17:38:58', '20100628T17:38:58' ),
-            ...         ( 'First Title', 'Second Title' )
-            ...     )]))     #doctest: +NORMALIZE_WHITESPACE
-            ['ID    Date        Title',
-            u' 7    06/28/09    First Title',
-            u'42    06/28/10    Second Title']
-
-            """
-            assert posts is not None
-            yield "%sID    Date%sTitle" % \
-                    ( ' ' * ( len(posts[0]['postid']) - 2 ),
-                    ( ' ' * len(BlogIt.DateTime_to_str(
-                    posts[0]['date_created_gmt'], '%x')) ) )
-            format = '%%%dd    %%s    %%s' % max(2, len(posts[0]['postid']))
-            for p in posts:
-                yield format % ( int(p['postid']),
-                        BlogIt.DateTime_to_str(p['date_created_gmt'], '%x'),
-                        p['title'] )
-
-
-    class AbstractPost(object):
-        def __init__(self, post_data={}, meta_data_dict={},
-                     meta_data_f_dict={}, headers=[], post_body=''):
-            self.post_data = post_data
-            self.meta_data_dict = meta_data_dict
-            self.meta_data_f_dict = meta_data_f_dict
-            self.HEADERS = headers
-            self.POST_BODY = post_body
-
+    class AbstractBufferIO(object):
         def refresh_vim_buffer(self):
             def enc(text):
                 try:
@@ -322,6 +285,85 @@ class BlogIt(object):
         def init_vim_buffer(self):
             vim.command('setlocal encoding=utf-8')
             self.refresh_vim_buffer()
+
+        def send(self, lines=[], push=None):
+            raise BlogIt.NoPostException
+
+
+    class PostTable(AbstractBufferIO):
+        def __init__(self, vim_vars=None, client=None):
+            if vim_vars is None:
+                vim_vars = BlogIt.VimVars()
+            self.vim_vars = vim_vars
+            if client is None:
+                client = xmlrpclib.ServerProxy(self.vim_vars.blog_url)
+            self.client = client
+            self.post_data = None
+
+        @classmethod
+        def create_new_post(cls, body_lines=['']):
+            b = cls()
+            b.getPost()
+            b.init_vim_buffer()
+            return b
+
+        def init_vim_buffer(self):
+            super(BlogIt.PostTable, self).init_vim_buffer()
+            vim.command('setlocal buftype=nofile bufhidden=wipe nobuflisted ' +
+                    'noswapfile syntax=blogsyntax nomodifiable nowrap')
+            vim.current.window.cursor = (2, 0)
+            vim.command('nnoremap <buffer> <enter> :py blogit.list_edit()<cr>')
+            vim.command('nnoremap <buffer> gf :py blogit.list_edit()<cr>')
+
+        def display(self):
+            """ Yields the rows of a table displaying the posts (at least one).
+            # XXX was: post_table.
+
+            >>> p = BlogIt.PostTable()
+            >>> p.post_data = [ {'postid': '1',
+            ...     'date_created_gmt': DateTime('20090628T17:38:58'),
+            ...     'title': 'A title'} ]
+            >>> list(p.display())    #doctest: +NORMALIZE_WHITESPACE
+            ['ID    Date        Title',
+            u' 1    06/28/09    A title']
+            >>> p.post_data = [{'postid': id,
+            ...     'date_created_gmt': DateTime(d), 'title': t}
+            ...     for id, d, t in zip(( '7', '42' ),
+            ...         ( '20090628T17:38:58', '20100628T17:38:58' ),
+            ...         ( 'First Title', 'Second Title' )
+            ...     )]
+            >>> list(p.display())    #doctest: +NORMALIZE_WHITESPACE
+            ['ID    Date        Title',
+            u' 7    06/28/09    First Title',
+            u'42    06/28/10    Second Title']
+
+            """
+            if self.post_data is None:
+                raise BlogIt.PostTableEmptyException
+            yield "%sID    Date%sTitle" % \
+                    ( ' ' * ( len(self.post_data[0]['postid']) - 2 ),
+                    ( ' ' * len(BlogIt.DateTime_to_str(
+                    self.post_data[0]['date_created_gmt'], '%x')) ) )
+            format = '%%%dd    %%s    %%s' % max(2,
+                                              len(self.post_data[0]['postid']))
+            for p in self.post_data:
+                yield format % ( int(p['postid']),
+                        BlogIt.DateTime_to_str(p['date_created_gmt'], '%x'),
+                        p['title'] )
+
+        def getPost(self):
+            self.post_data = self.client.metaWeblog.getRecentPosts('',
+                    self.vim_vars.blog_username, self.vim_vars.blog_password)
+
+
+    class AbstractPost(AbstractBufferIO):
+        def __init__(self, post_data={}, meta_data_dict={},
+                     meta_data_f_dict={}, headers=[], post_body=''):
+            self.post_data = post_data
+            self.meta_data_dict = meta_data_dict
+            self.meta_data_f_dict = meta_data_f_dict
+            self.HEADERS = headers
+            self.POST_BODY = post_body
 
         def read_header(self, line):
             """ XXX: Previously called getMeta().
@@ -1182,24 +1224,12 @@ class BlogIt(object):
     @vimcommand
     def command_ls(self):
         """ list all posts """
+        vim.command('botright new')
         try:
-            p = self.current_post
-            allposts = p.client.metaWeblog.getRecentPosts('',
-                    p.vim_vars.blog_username, p.vim_vars.blog_password)
-            if not allposts:
-                sys.stderr.write("There are no posts.")
-                return
-            vim.command('botright new')
-            self.current_post = None
-            vim.current.buffer[:] = [ line.encode('utf-8') for line in
-                                        BlogIt.PostTable.post_table(allposts) ]
-            vim.command('setlocal buftype=nofile bufhidden=wipe nobuflisted ' +
-                    'noswapfile syntax=blogsyntax nomodifiable nowrap')
-            vim.current.window.cursor = (2, 0)
-            vim.command('nnoremap <buffer> <enter> :py blogit.list_edit()<cr>')
-            vim.command('nnoremap <buffer> gf :py blogit.list_edit()<cr>')
-        except Exception, err:
-            sys.stderr.write("An error has occured: %s" % err)
+            self.current_post = BlogIt.PostTable.create_new_post()
+        except BlogIt.PostTableEmptyException:
+            vim.command('bdelete')
+            sys.stderr.write("There are no posts.")
 
     @vimcommand
     def command_new(self):

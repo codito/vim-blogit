@@ -123,13 +123,13 @@ function! BlogitComplete(findstart, base)
             let L = s:used_categories
         elseif getline('.') =~# '^Tags: '
             let L = s:used_tags
-        elseif getline('.') =~# '^Status: '
-            if getline(0) =~# '^=============================================='
-                " for comments
+        elseif getline('.') =~# '^Status: ' && exists('b:blog_post_type')
+            if b:blog_post_type == 'comments'
                 let L = [ 'approve', 'spam', 'hold', 'new', 'rm' ]
-            else
-                " for blogposts
+            elseif b:blog_post_type == 'post'
                 let L = [ 'draft', 'publish', 'private', 'pending', 'new', 'rm' ]
+            else
+                let L = [ ]
             endif
             let sep = ''
         else
@@ -269,6 +269,9 @@ class BlogIt(object):
         def export_blog_name(self):
             vim.command("let b:blog_name='%s'" % self.blog_name)
 
+        def export_post_type(self, post):
+            vim.command("let b:blog_post_type='%s'" % post.POST_TYPE)
+
 
     class NoPost(object):
         BLOG_POST_ID = ''
@@ -304,6 +307,8 @@ class BlogIt(object):
 
 
     class PostTable(AbstractBufferIO):
+        POST_TYPE = 'list'
+
         def __init__(self, vim_vars=None, client=None, row_types=None):
             if vim_vars is None:
                 vim_vars = BlogIt.VimVars()
@@ -506,6 +511,8 @@ class BlogIt(object):
 
 
     class BlogPost(AbstractPost):
+        POST_TYPE = 'post'
+
         def __init__(self, blog_post_id, post_data={}, meta_data_dict=None,
                      meta_data_f_dict=None, headers=None,
                      post_body='description', vim_vars=None):
@@ -837,6 +844,8 @@ class BlogIt(object):
 
 
     class CommentList(Comment):
+        POST_TYPE = 'comments'
+
         def __init__(self, meta_data_dict=None,
                      meta_data_f_dict=None, headers=None, post_body='content',
                      comment_categories=None):
@@ -1145,6 +1154,7 @@ class BlogIt(object):
         """
         self._posts[vim.current.buffer.number] = post
         post.vim_vars.export_blog_name()
+        post.vim_vars.export_post_type(post)
 
     current_post = property(_get_current_post, _set_current_post)
 

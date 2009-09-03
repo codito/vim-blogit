@@ -107,7 +107,7 @@ command! -nargs=* Blogit exec('py blogit.command(<f-args>)')
 let s:used_categories = []
 let s:used_tags = []
 
-function! BlogitComplete(findstart, base)
+function! BlogItComplete(findstart, base)
     " based on code from :he complete-functions
     if a:findstart
         " locate the start of the word
@@ -145,7 +145,7 @@ function! BlogitComplete(findstart, base)
     endif
 endfunction
 
-function! CommentsFoldText()
+function! BlogItCommentsFoldText()
     let line_no = v:foldstart
     if v:foldlevel > 1
         while getline(line_no) !~ '^\s*$'
@@ -569,7 +569,7 @@ class BlogIt(object):
             super(BlogIt.BlogPost, self).init_vim_buffer()
             vim.command('nnoremap <buffer> gf :py blogit.list_comments()<cr>')
             vim.command('setlocal ft=mail textwidth=0 ' +
-                                 'completefunc=BlogitComplete')
+                                 'completefunc=BlogItComplete')
             vim.current.window.cursor = (8, 0)
 
         def read_body(self, lines):
@@ -859,8 +859,8 @@ class BlogIt(object):
 
         def init_vim_buffer(self):
             super(BlogIt.CommentList, self).init_vim_buffer()
-            vim.command('setlocal linebreak completefunc=BlogitComplete ' +
-                               'foldmethod=marker foldtext=CommentsFoldText()')
+            vim.command('setlocal linebreak completefunc=BlogItComplete ' +
+                               'foldmethod=marker foldtext=BlogItCommentsFoldText()')
 
         def empty_comment_list(self):
             self.comment_list = {}

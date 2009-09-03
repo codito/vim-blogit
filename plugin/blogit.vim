@@ -19,87 +19,7 @@
 " URL:          http://symlink.me/wiki/blogit
 " Version:      1.3
 " Last Change:  2009 August 16
-"
-" Commands :
-" ":Blogit ls"
-"   Lists all articles in the blog
-" ":Blogit new"
-"   Opens page to write new article
-" ":Blogit this"
-"   Make current buffer a blog post
-" ":Blogit edit <id>"
-"   Opens the article <id> for edition
-" ":Blogit commit"
-"   Saves the article to the blog
-" ":Blogit push"
-"   Publish article
-" ":Blogit unpush"
-"   Unpublish article
-" ":Blogit rm <id>"
-"   Remove an article
-" ":Blogit tags"
-"   Show tags and categories list
-" ":Blogit preview"
-"   Preview current post locally
-" ":Blogit help"
-"   Display help
-"
-" Note that preview might not work on all platforms. This is because we have
-" to rely on unsupported and non-portable functionality from the python
-" standard library.
-"
-"
-" Configuration :
-"   Create a file called passwords.vim somewhere in your 'runtimepath'
-"   (preferred location is "~/.vim/"). Don't forget to set the permissions so
-"   only you can read it. This file should include:
-"
-"       let blogit_username='Your blog user name'
-"       let blogit_password='Your blog password. Not the API-key.'
-"       let blogit_url='https://your.path.to/xmlrpc.php'
-"
-"   In addition you can set these settings in your vimrc:
-"
-"       let blogit_unformat='pandoc --from=html --to=rst --reference-links'
-"       let blogit_format='pandoc --from=rst --to=html --no-wrap'
-"
-"   The blogit_format and blogit_unformat each contain a shell command to
-"   filter the blog entry text (no meta data) before a commit and after an
-"   edit, respectively. In the example we use pandoc[1] to edit the blog in
-"   reStructuredText[2].
-"
-"   If you have multible blogs replace 'blogit' in 'blogit_username' etc. by a
-"   name of your choice (e.g. 'your_blog_name') and use:
-"
-"       let blog_name='your_blog_name'
-"
-"   to switch which is used by default. If a blog post/comment/list is open in
-"   the current buffer that is used instead. To explicitly select which blog
-"   should be used with the commands ls, new, this and edit add your_blog_name
-"   as and aditional argument, e.g.:
-"
-"       :Blogit edit 42 your_blog_name
-"
-"
-" Usage :
-"   Just fill in the blanks, do not modify the highlighted parts and everything
-"   should be ok.
-"
-"   gf or <enter> in the ':Blogit ls' buffer edits the blog post in the
-"   current line.
-"
-"   Categories and tags can be omni completed via *compl-function* (usually
-"   CTRL-X_CTRL-U). The list of them is gotten automatically on first
-"   ":Blogit edit" and can be updated with ":Blogit tags".
-"
-"   To use tags your WordPress needs to have the UTW-RPC[3] plugin installed
-"   (WordPress.com does).
-"
-" [1] http://johnmacfarlane.net/pandoc/
-" [2] http://docutils.sourceforge.net/docs/ref/rst/introduction.html
-" [3] http://blog.circlesixdesign.com/download/utw-rpc-autotag/
-"
-" vim: set et softtabstop=4 cinoptions=4 shiftwidth=4 ts=4 ai
+
 
 runtime! passwords.vim
 command! -nargs=* Blogit exec('py blogit.command(<f-args>)')
@@ -1294,10 +1214,10 @@ class BlogIt(object):
         ...         ' A method. '
         ...         print "f should not be executed."
         ...     def command_g(self, one, two):
-        ...         ' A method with options. '
+        ...         ' A method with arguments. '
         ...         print "g should not be executed."
         ...     def command_h(self, one, two=None):
-        ...         ' A method with an optional option. '
+        ...         ' A method with an optional arguments. '
         >>> L = []
         >>> BlogIt.vimcommand(C.command_f, L)
         <unbound method C.command_f>
@@ -1308,13 +1228,13 @@ class BlogIt(object):
         <unbound method C.command_g>
         >>> L     #doctest: +NORMALIZE_WHITESPACE
         [':Blogit f                  A method. \n',
-         ':Blogit g <one> <two>      A method with options. \n']
+         ':Blogit g {one} {two}      A method with arguments. \n']
         >>> BlogIt.vimcommand(C.command_h, L)
         <unbound method C.command_h>
         >>> L     #doctest: +NORMALIZE_WHITESPACE
         [':Blogit f                  A method. \n',
-         ':Blogit g <one> <two>      A method with options. \n',
-         ':Blogit h <one> [two]      A method with an optional option. \n']
+         ':Blogit g {one} {two}      A method with arguments. \n',
+         ':Blogit h {one} [two]      A method with an optional arguments. \n']
 
         """
 
@@ -1328,7 +1248,7 @@ class BlogIt(object):
             cut = len(args)
             if defaults:
                 cut -= len(defaults)
-            args = [ "<%s>" % a for a in args[skip:cut] ] + \
+            args = [ "{%s}" % a for a in args[skip:cut] ] + \
                    [ "[%s]" % a for a in args[cut:] ]
             if varargs:
                 args.append("[*%s]" % varargs)

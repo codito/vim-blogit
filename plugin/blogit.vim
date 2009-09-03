@@ -196,7 +196,7 @@ class BlogIt(object):
         pass
 
 
-    class PostTableEmptyException(BlogItException):
+    class PostListingEmptyException(BlogItException):
         pass
 
 
@@ -306,7 +306,7 @@ class BlogIt(object):
             raise BlogIt.NoPostException
 
 
-    class PostTable(AbstractBufferIO):
+    class PostListing(AbstractBufferIO):
         POST_TYPE = 'list'
 
         def __init__(self, vim_vars=None, client=None, row_types=None):
@@ -318,8 +318,8 @@ class BlogIt(object):
             self.client = client
             self.post_data = None
             if row_types is None:
-                row_types = ( BlogIt.MetaWeblogPostTablePosts,
-                              BlogIt.WordPressPostTablePages )
+                row_types = ( BlogIt.MetaWeblogPostListingPosts,
+                              BlogIt.WordPressPostListingPages )
             self.row_groups = [ group(vim_vars) for group in row_types ]
 
         @classmethod
@@ -330,7 +330,7 @@ class BlogIt(object):
             return b
 
         def init_vim_buffer(self):
-            super(BlogIt.PostTable, self).init_vim_buffer()
+            super(BlogIt.PostListing, self).init_vim_buffer()
             vim.command('setlocal buftype=nofile bufhidden=wipe nobuflisted ' +
                     'noswapfile syntax=blogsyntax nomodifiable nowrap')
             vim.current.window.cursor = (2, 0)
@@ -340,11 +340,11 @@ class BlogIt(object):
         def display(self):
             """ Yields the rows of a table displaying the posts (at least one).
 
-            >>> p = BlogIt.PostTable()
+            >>> p = BlogIt.PostListing()
             >>> p.display().next()       #doctest: +ELLIPSIS
             Traceback (most recent call last):
               [...]
-            PostTableEmptyException
+            PostListingEmptyException
             >>> p.row_groups[0].post_data = [ {'postid': '1',
             ...     'date_created_gmt': DateTime('20090628T17:38:58'),
             ...     'title': 'A title'} ]
@@ -367,7 +367,7 @@ class BlogIt(object):
                 if not row_group.is_empty:
                     break
             else:
-                raise BlogIt.PostTableEmptyException
+                raise BlogIt.PostListingEmptyException
             id_column_width = max(2, *[ p.min_id_column_width
                                             for p in self.row_groups ])
             yield "%sID    Date%sTitle" % ( ' ' * ( id_column_width - 2 ),
@@ -387,7 +387,7 @@ class BlogIt(object):
                 row_group.getPost(response)
 
 
-    class AbstractPostTableSource(object):
+    class AbstractPostListingSource(object):
         def __init__(self, id_date_title_tags, vim_vars):
             self.id_date_title_tags = id_date_title_tags
             self.vim_vars = vim_vars
@@ -412,9 +412,9 @@ class BlogIt(object):
                 yield ( p[post_id], p[date], p[title] )
 
 
-    class MetaWeblogPostTablePosts(AbstractPostTableSource):
+    class MetaWeblogPostListingPosts(AbstractPostListingSource):
         def __init__(self, vim_vars):
-            super(BlogIt.MetaWeblogPostTablePosts, self).__init__(
+            super(BlogIt.MetaWeblogPostListingPosts, self).__init__(
                 ( 'postid', 'date_created_gmt', 'title' ), vim_vars )
 
         def xmlrpc_call__getPost(self, multicall):
@@ -422,9 +422,9 @@ class BlogIt(object):
                     self.vim_vars.blog_username, self.vim_vars.blog_password)
 
 
-    class WordPressPostTablePages(AbstractPostTableSource):
+    class WordPressPostListingPages(AbstractPostListingSource):
         def __init__(self, vim_vars):
-            super(BlogIt.WordPressPostTablePages, self).__init__(
+            super(BlogIt.WordPressPostListingPages, self).__init__(
                 ( 'page_id', 'dateCreated', 'page_title' ), vim_vars )
 
         def xmlrpc_call__getPost(self, multicall):
@@ -1353,8 +1353,8 @@ class BlogIt(object):
         vim_vars = self.get_vim_vars(blog)
         vim.command('botright new')
         try:
-            self.current_post = BlogIt.PostTable.create_new_post(vim_vars)
-        except BlogIt.PostTableEmptyException:
+            self.current_post = BlogIt.PostListing.create_new_post(vim_vars)
+        except BlogIt.PostListingEmptyException:
             vim.command('bdelete')
             sys.stderr.write("There are no posts.")
 

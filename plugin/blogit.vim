@@ -44,7 +44,7 @@
 " ":Blogit help"
 "   Display help
 "
-" Note that preview might not word on all platforms. This is because we have
+" Note that preview might not work on all platforms. This is because we have
 " to rely on unsupported and non-portable functionality from the python
 " standard library.
 "
@@ -72,10 +72,14 @@
 "   name of your choice (e.g. 'your_blog_name') and use:
 "
 "       let blog_name='your_blog_name'
-"   or
-"       let b:blog_name='your_blog_name'
 "
-"   to switch between them.
+"   to switch which is used by default. If a blog post/comment/list is open in
+"   the current buffer that is used instead. To explicitly select which blog
+"   should be used with the commands ls, new, this and edit add your_blog_name
+"   as and aditional argument, e.g.:
+"
+"       :Blogit edit 42 your_blog_name
+"
 "
 " Usage :
 "   Just fill in the blanks, do not modify the highlighted parts and everything
@@ -205,6 +209,11 @@ class BlogIt(object):
 
 
     class VimVars(object):
+        def __init__(self, blog_name=None):
+            if blog_name is None:
+                blog_name = self.vim_blog_name
+            self.blog_name = blog_name
+
         @property
         def blog_username(self):
             return self.vim_variable('username')
@@ -241,7 +250,7 @@ class BlogIt(object):
             return self.vim_variable('postsource') == '1'
 
         @property
-        def blog_name(self):
+        def vim_blog_name(self):
             for var_name in ( 'b:blog_name', 'blog_name' ):
                 var_value = self.vim_variable(var_name, prefix=False)
                 if var_value is not None:
@@ -257,16 +266,20 @@ class BlogIt(object):
             else:
                 return None
 
+        def export_blog_name(self):
+            vim.command("let b:blog_name='%s'" % self.blog_name)
+
 
     class NoPost(object):
         BLOG_POST_ID = ''
 
-        def __init__(self):
-            self.vim_vars = BlogIt.VimVars()
-
         @property
         def client(self):
             return xmlrpclib.ServerProxy(self.vim_vars.blog_url)
+
+        @property
+        def vim_vars(self):
+            return BlogIt.VimVars()
 
         def __getattr__(self, name):
             raise BlogIt.NoPostException
@@ -305,8 +318,8 @@ class BlogIt(object):
             self.row_groups = [ group(vim_vars) for group in row_types ]
 
         @classmethod
-        def create_new_post(cls, body_lines=['']):
-            b = cls()
+        def create_new_post(cls, vim_vars, body_lines=['']):
+            b = cls(vim_vars=vim_vars)
             b.getPost()
             b.init_vim_buffer()
             return b
@@ -537,8 +550,8 @@ class BlogIt(object):
                     + s ) % d
 
         @classmethod
-        def create_new_post(cls, body_lines=['']):
-            b = cls('')
+        def create_new_post(cls, vim_vars, body_lines=['']):
+            b = cls('', vim_vars=vim_vars)
             b.post_data.update({'post_status': 'draft', 'description': '',
                     'wp_author_display_name': b.vim_vars.blog_username})
             b.init_vim_buffer()
@@ -991,6 +1004,10 @@ class BlogIt(object):
                     j = i + 1
             yield super(BlogIt.CommentList, self).read_post(lines[j:])
 
+        @classmethod
+        def create_from_post(cls, blog_post):
+            return cls(blog_post.BLOG_POST_ID, vim_vars=blog_post.vim_vars)
+
 
     class WordPressCommentList(CommentList):
         def __init__(self, blog_post_id, meta_data_dict=None,
@@ -1116,16 +1133,18 @@ class BlogIt(object):
     def _set_current_post(self, post):
         """
         >>> vim.current.buffer.change_buffer(3)
-        >>> blogit.current_post = { 'p3': 3 }
+        >>> blogit.current_post = Mock('post@buffer_3_', tracker=None)
         >>> vim.current.buffer.change_buffer(7)
         >>> blogit.current_post    #doctest: +ELLIPSIS
         <__main__.NoPost object at 0x...>
-        >>> blogit.current_post = { 'p7': 42 }
+        >>> blogit.current_post = Mock('post@buffer_7_', tracker=None)
         >>> vim.current.buffer.change_buffer(3)
-        >>> blogit.current_post
-        {'p3': 3}
+        >>> blogit.current_post    #doctest: +ELLIPSIS
+        <Mock 0x... post@buffer_3_>
+        >>> vim.current.buffer.change_buffer(42)
         """
         self._posts[vim.current.buffer.number] = post
+        post.vim_vars.export_blog_name()
 
     current_post = property(_get_current_post, _set_current_post)
 
@@ -1178,7 +1197,7 @@ class BlogIt(object):
 
     def list_comments(self):
         if vim.current.line.startswith('Status: '):
-            p = BlogIt.WordPressCommentList(self.current_post.BLOG_POST_ID)
+            p = BlogIt.WordPressCommentList.create_from_post(self.current_post)
             vim.command('enew')
             self.current_post = p
             try:
@@ -1197,7 +1216,7 @@ class BlogIt(object):
         >>> vim.current.buffer[:] = [ '12 random text' ]
         >>> blogit.list_edit()
         Called vim.command('bdelete')
-        Called vim.command('Blogit edit 12')
+        Called vim.command('Blogit edit 12 blogit')
 
         >>> vim.current.buffer[:] = [ 'no blog id 12' ]
         >>> mock('blogit.command_new')
@@ -1215,10 +1234,11 @@ class BlogIt(object):
             vim.command('bdelete')
             self.command_new()
         else:
+            blog_name = self.current_post.vim_vars.blog_name
             vim.command('bdelete')
             # To access vim s:variables we can't call this directly
             # via command_edit
-            vim.command('Blogit edit %s' % id)
+            vim.command('Blogit edit %s %s' % ( id, blog_name ))
 
     @staticmethod
     def str_to_DateTime(text='', format='%c'):
@@ -1266,7 +1286,8 @@ class BlogIt(object):
         ...     def command_g(self, one, two):
         ...         ' A method with options. '
         ...         print "g should not be executed."
-        ...
+        ...     def command_h(self, one, two=None):
+        ...         ' A method with an optional option. '
         >>> L = []
         >>> BlogIt.vimcommand(C.command_f, L)
         <unbound method C.command_f>
@@ -1278,6 +1299,12 @@ class BlogIt(object):
         >>> L     #doctest: +NORMALIZE_WHITESPACE
         [':Blogit f                  A method. \n',
          ':Blogit g <one> <two>      A method with options. \n']
+        >>> BlogIt.vimcommand(C.command_h, L)
+        <unbound method C.command_h>
+        >>> L     #doctest: +NORMALIZE_WHITESPACE
+        [':Blogit f                  A method. \n',
+         ':Blogit g <one> <two>      A method with options. \n',
+         ':Blogit h <one> [two]      A method with an optional option. \n']
 
         """
 
@@ -1288,58 +1315,67 @@ class BlogIt(object):
             """
             skip += 1
             args, varargs, varkw, defaults = getargspec(func)
-            arguments = list(args)
+            cut = len(args)
             if defaults:
-                index = len(arguments)-1
-                for default in reversed(defaults):
-                    arguments[index] += "=%s" % default
-                    index -= 1
+                cut -= len(defaults)
+            args = [ "<%s>" % a for a in args[skip:cut] ] + \
+                   [ "[%s]" % a for a in args[cut:] ]
             if varargs:
-                arguments.append("*" + varargs)
+                args.append("[*%s]" % varargs)
             if varkw:
-                arguments.append("**" + varkw)
-            return "".join((" <%s>" % s for s in arguments[skip:]))
+                args.append("[**%s]" % varkw)
+            return " ".join(args)
 
-        command = ( f.func_name.replace('command_', ':Blogit ') +
-                getArguments(f) )
+        command = '%s %s' % ( f.func_name.replace('command_', ':Blogit '),
+                              getArguments(f) )
         register_to.append('%-25s %s\n' % ( command, f.__doc__ ))
         return f
 
+    def get_vim_vars(self, blog_name=None):
+        if blog_name is not None:
+            return BlogIt.VimVars(blog_name)
+        else:
+            return self.current_post.vim_vars
+
     @vimcommand
-    def command_ls(self):
+    def command_ls(self, blog=None):
         """ list all posts """
+        vim_vars = self.get_vim_vars(blog)
         vim.command('botright new')
         try:
-            self.current_post = BlogIt.PostTable.create_new_post()
+            self.current_post = BlogIt.PostTable.create_new_post(vim_vars)
         except BlogIt.PostTableEmptyException:
             vim.command('bdelete')
             sys.stderr.write("There are no posts.")
 
     @vimcommand
-    def command_new(self):
+    def command_new(self, blog=None):
         """ create a new post """
+        vim_vars = self.get_vim_vars(blog)
         vim.command('enew')
-        self.current_post = BlogIt.WordPressBlogPost.create_new_post()
+        self.current_post = BlogIt.WordPressBlogPost.create_new_post(vim_vars)
 
     @vimcommand
-    def command_this(self):
+    def command_this(self, blog=None):
         """ make this a blog post """
         if self.current_post is self.NO_POST:
+            vim_vars = self.get_vim_vars(blog)
             self.current_post = BlogIt.WordPressBlogPost.create_new_post(
-                    vim.current.buffer[:])
+                    vim_vars, vim.current.buffer[:])
         else:
             sys.stderr.write("Already editing a post.")
 
     @vimcommand
-    def command_edit(self, id):
+    def command_edit(self, id, blog=None):
         """ edit a post """
+        vim_vars = self.get_vim_vars(blog)
         try:
             id = int(id)
         except ValueError:
             sys.stderr.write("'id' must be an integer value.")
             return
 
-        post = BlogIt.WordPressBlogPost(id)
+        post = BlogIt.WordPressBlogPost(id, vim_vars=vim_vars)
         try:
             post.getPost()
         except Fault, e:

@@ -79,7 +79,7 @@ function! BlogItCommentsFoldText()
 endfunction
 
 python <<EOF
-# Lets the python unit test ignore eveything above this line (docstring). """
+# Lets the python unit test ignore everything above this line (docstring). """
 import xmlrpclib, sys, re
 from time import mktime, strptime, strftime, localtime, gmtime
 from locale import getpreferredencoding
@@ -353,116 +353,256 @@ class BlogIt(object):
 
 
     class AbstractPost(AbstractBufferIO):
-        def __init__(self, post_data={}, meta_data_dict={},
-                     meta_data_f_dict={}, headers=[], post_body=''):
+        class BlogItServerVarUndefined(Exception):
+            def __init__(self, label):
+                super(BlogIt.AbstractPost.BlogItServerVarUndefined, self
+                     ).__init__('Unknown: %s.' % label)
+                self.label = label
+
+        def __init__(self, post_data={}, meta_data_dict={}, headers=[],
+                     post_body=''):
+            """
+            >>> BlogIt.AbstractPost(headers=['a', 'b', 'c']).meta_data_dict
+            {'Body': '', 'a': 'a', 'c': 'c', 'b': 'b'}
+            """
             self.post_data = post_data
-            self.meta_data_dict = meta_data_dict
-            self.meta_data_f_dict = meta_data_f_dict
+            self.new_post_data = {}
+            self.meta_data_dict = { 'Body': post_body }
+            for h in headers:
+                self.meta_data_dict[h] = h
+            self.meta_data_dict.update(meta_data_dict)
+            self.meta_data_dict['Body'] = post_body
             self.HEADERS = headers
-            self.POST_BODY = post_body
+            self.POST_BODY = post_body   # for transition
+
+        def __getattr__(self, name):
+            """
+
+            >>> p = BlogIt.AbstractPost()
+            >>> mock('p.get_server_var_default', tracker=None)
+            >>> mock('p.display_header_default', tracker=None)
+            >>> p.get_server_var__foo() == p.get_server_var_default('foo')
+            True
+            >>> p.get_server_var__A() == p.get_server_var_default('A')
+            True
+            >>> p.display_header__A() == p.display_header_default('A')
+            True
+            >>> minimock.restore()
+            """
+            def base_name():
+                start = name.find('__') + 2
+                return name[start:]
+            if name.startswith('get_server_var__'):
+                return lambda: self.get_server_var_default(base_name())
+            elif name.startswith('set_server_var__'):
+                return lambda val: \
+                        self.set_server_var_default(base_name(), val)
+            elif name.startswith('display_header__'):
+                return lambda: self.display_header_default(base_name())
+            elif name.startswith('read_header__'):
+                return lambda val: self.read_header_default(base_name(), val)
+            raise AttributeError
 
         def read_header(self, line):
-            """ Reads the meta-data in the current buffer.
+            """ Reads the meta-data line as used in a vim buffer.
 
-            Outputed as dictionary.
-
-            >>> blogit.AbstractPost().read_header('tag: value')
-            ('tag', 'value')
+            >>> mock('BlogIt.AbstractPost.read_header_default')
+            >>> BlogIt.AbstractPost().read_header('tag: value')
+            Called BlogIt.AbstractPost.read_header_default('tag', u'value')
+            >>> minimock.restore()
             """
             r = re.compile('^(.*?): (.*)$')
             m = r.match(line)
-            return m.group(1, 2)
+            label, v = m.group(1, 2)
+            getattr(self, 'read_header__' + label)(unicode(v.strip(), 'utf-8'))
 
         def read_body(self, lines):
-            return '\n'.join(lines).strip()
+            r"""
+            >>> mock('BlogIt.AbstractPost.read_header_default')
+            >>> BlogIt.AbstractPost().read_body(['one', 'two'])
+            Called BlogIt.AbstractPost.read_header_default('Body', 'one\ntwo')
+            >>> minimock.restore()
+            """
+            self.read_header__Body('\n'.join(lines).strip())
 
         def read_post(self, lines):
             r""" Returns the dict from given text of the post.
 
-            >>> BlogIt.AbstractPost(post_body='content').read_post(
-            ...         [ 'Tag:  Value  ', '', 'Some Text', 'in two lines.' ])
+            >>> BlogIt.AbstractPost(post_body='content', headers=['Tag']
+            ...                    ).read_post(['Tag:  Value  ', '',
+            ...                                 'Some Text', 'in two lines.' ])
             {'content': 'Some Text\nin two lines.', 'Tag': u'Value'}
             """
-            d = {self.POST_BODY: ''}
+            self.set_server_var__Body('')
             for i, line in enumerate(lines):
                 if line.strip() == '':
-                    d[self.POST_BODY] = self.read_body(lines[i+1:])
+                    self.read_body(lines[i+1:])
                     break
-                t, v = self.read_header(line)
-                if not t.startswith('blogit_'):
-                    d[t] = unicode(v.strip(), 'utf-8')
-            return d
+                self.read_header(line)
+            return self.new_post_data
 
         def display(self):
             for label in self.HEADERS:
-                yield self.format_header(label)
+                yield self.display_header(label)
             yield ''
-            for line in self.format_body():
+            for line in self.display_body():
                 yield line
 
-        def format_header(self, label):
+        def display_header(self, label):
             """
             Returns a header line formated as it will be displayed to the user.
 
-            >>> blogit.AbstractPost().format_header('A')
-            'A: '
+            >>> blogit.AbstractPost().display_header('A')
+            'A: <A>'
             >>> blogit.AbstractPost(meta_data_dict={'A': 'a'}
-            ...                    ).format_header('A')
-            'A: '
+            ...                    ).display_header('A')
+            'A: <A>'
             >>> blogit.AbstractPost(post_data={'b': 'two'},
-            ...     meta_data_dict={'A': 'a'}).format_header('A')
-            'A: '
+            ...     meta_data_dict={'A': 'a'}).display_header('A')
+            'A: <A>'
             >>> blogit.AbstractPost(post_data={'a': 'one', 'b': 'two'},
-            ...     meta_data_dict={'A': 'a'}).format_header('A')
+            ...     meta_data_dict={'A': 'a'}).display_header('A')
             'A: one'
-            >>> blogit.AbstractPost(post_data={'a': 'onE'},
-            ...     meta_data_dict={'A': 'a'},
-            ...     meta_data_f_dict={'A': lambda x: x.swapcase()}
-            ...     ).format_header('A')
-            'A: ONe'
+
+            >>> class B(BlogIt.AbstractPost):
+            ...     def display_header__to_be_tested(self):
+            ...         return 'text'
+            >>> B().display_header('to_be_tested')
+            'to_be_tested: text'
+
+            >>> BlogIt.AbstractPost().display_header__foo()
+            '<foo>'
+            """
+            text = getattr(self, 'display_header__' + label)()
+            return '%s: %s' % ( label, unicode(text).encode('utf-8') )
+
+        def display_header_default(self, label):
+            return getattr(self, 'get_server_var__' + label)()
+
+        def read_header_default(self, label, text):
+            getattr(self, 'set_server_var__' + label)(text.strip())
+
+        def get_server_var_default(self, label):
+            """
+
+            >>> BlogIt.AbstractPost().get_server_var_default('foo')
+            '<foo>'
             """
             try:
-                val = self.post_data[self.meta_data_dict[label]]
+                return self.post_data[self.meta_data_dict[label]]
             except KeyError:
-                val = ''
-            if label in self.meta_data_f_dict:
-                val = self.meta_data_f_dict[label](val)
-            return '%s: %s' % ( label, unicode(val).encode('utf-8') )
+                if '_AS_' in label:
+                    raise self.BlogItServerVarUndefined(label)
+                else:
+                    return self.get_server_var_not_found(label)
+
+        def get_server_var_not_found(self, label):
+            return '<%s>' % label
+
+        def get_server_var_different_type(self, label, from_type):
+            """
+            >>> blogit.AbstractPost(post_data={'a': 'one, two, three' },
+            ...     meta_data_dict={'Tags': 'a'}).display_header('Tags')
+            'Tags: one, two, three'
+            >>> blogit.AbstractPost({'a': [ 'one', 'two', 'three' ]},
+            ...                     {'Tags_AS_list': 'a'}
+            ...                    ).display_header('Tags')
+            'Tags: one, two, three'
+            """
+            try:
+                val = getattr(self, 'get_server_var__%s_AS_%s' % (
+                        label, from_type ))()
+            except self.BlogItServerVarUndefined:
+                return self.get_server_var_default(label)
+            else:
+                return getattr(self, 'server_var_from__' + from_type)(val)
+
+        def set_server_var_different_type(self, label, from_type, str_val):
+            """
+            >>> p = blogit.AbstractPost(post_data={'a': 'b'},
+            ...     meta_data_dict={'Tags': 'a'})
+            >>> p.set_server_var__Tags('one, two, three')
+            >>> p.new_post_data
+            {'a': 'one, two, three'}
+            >>> p = blogit.AbstractPost({'a': [ 'b' ]},
+            ...                         {'Tags_AS_list': 'a'})
+            >>> p.set_server_var__Tags('one, two, three')
+            >>> p.new_post_data
+            {'a': ['one', 'two', 'three']}
+            """
+            val = getattr(self, 'server_var_to__' + from_type)(str_val)
+            try:
+                getattr(self, 'set_server_var__%s_AS_%s' % (
+                        label, from_type ))(val)
+            except self.BlogItServerVarUndefined:
+                self.set_server_var_default(label, str_val)
+
+        def get_server_var__Date(self):
+            return self.get_server_var_different_type('Date', 'DateTime')
+
+        def set_server_var__Date(self, val):
+            try:
+                self.set_server_var_different_type('Date', 'DateTime', val)
+            except ValueError:
+                pass
+
+        def get_server_var__Categories(self):
+            return self.get_server_var_different_type('Categories', 'list')
+
+        def set_server_var__Categories(self):
+            self.set_server_var_different_type('Categories', 'list', val)
+
+        def get_server_var__Tags(self):
+            return self.get_server_var_different_type('Tags', 'list')
+
+        def set_server_var__Tags(self, val):
+            self.set_server_var_different_type('Tags', 'list', val)
+
+        def server_var_to__DateTime(self, str_val):
+            return BlogIt.str_to_DateTime(str_val)
+
+        def server_var_from__DateTime(self, val):
+            return BlogIt.DateTime_to_str(val)
+
+        def server_var_to__list(self, str_val):
+            return [ s.strip() for s in str_val.split(',') ]
+
+        def server_var_from__list(self, val):
+            return ', '.join(val)
+
+        def set_server_var_default(self, label, val):
+            try:
+                self.new_post_data[self.meta_data_dict[label]] = val
+            except KeyError:
+                raise self.BlogItServerVarUndefined(label)
 
 
     class BlogPost(AbstractPost):
         POST_TYPE = 'post'
 
         def __init__(self, blog_post_id, post_data={}, meta_data_dict=None,
-                     meta_data_f_dict=None, headers=None,
-                     post_body='description', vim_vars=None):
+                     headers=None, post_body='description', vim_vars=None):
             if meta_data_dict is None:
                 meta_data_dict = {'From': 'wp_author_display_name',
-                                  'Post-Id': 'postid',
+                                  'Id': 'postid',
                                   'Subject': 'title',
-                                  'Categories': 'categories',
+                                  'Categories_AS_list': 'categories',
                                   'Tags': 'mt_keywords',
-                                  'Date': 'date_created_gmt',
-                                  'Status': 'blogit_status',
+                                  'Date_AS_DateTime': 'date_created_gmt',
+                                  'Status_AS_dict': 'blogit_status',
                                  }
-            if meta_data_f_dict is None:
-                def split_comma(x): return x.split(', ')
-                meta_data_f_dict = { 'Date': BlogIt.DateTime_to_str,
-                           'Categories': lambda L: ', '.join(L),
-                           'Status': self._display_comment_count
-                         }
             if headers is None:
-                headers = ['From', 'Post-Id', 'Subject', 'Status',
+                headers = ['From', 'Id', 'Subject', 'Status',
                            'Categories', 'Tags', 'Date' ]
             if vim_vars is None:
                 vim_vars = BlogIt.VimVars()
             super(BlogIt.BlogPost, self).__init__(post_data, meta_data_dict,
-                     meta_data_f_dict, headers, post_body)
+                     headers, post_body)
             self.vim_vars = vim_vars
             self.BLOG_POST_ID = blog_post_id
 
-        @staticmethod
-        def _display_comment_count(d):
+        def display_header__Status(self):
+            d = self.get_server_var__Status_AS_dict()
             if d == '':
                 return u'new'
             comment_typ_count = [ '%s %s' % (d[key], text)
@@ -492,43 +632,19 @@ class BlogIt(object):
                                  'completefunc=BlogItComplete')
             vim.current.window.cursor = (8, 0)
 
-        def read_body(self, lines):
-            r"""
-
-            Can raise FilterException.
-
-            >>> mock('vim.mocked_eval')
-
-            >>> blogit.BlogPost(42).read_body([ 'one', 'two', 'tree', 'four' ])
-            Called vim.mocked_eval("exists('blogit_format')")
-            Called vim.mocked_eval("exists('blogit_postsource')")
-            ['one\ntwo\ntree\nfour']
-
-            >>> mock('vim.mocked_eval', returns_iter=['1', 'sort', '0'])
-            >>> blogit.BlogPost(42).read_body([ 'one', 'two', 'tree', 'four' ])
-            Called vim.mocked_eval("exists('blogit_format')")
-            Called vim.mocked_eval('blogit_format')
-            Called vim.mocked_eval("exists('blogit_postsource')")
-            ['four\none\ntree\ntwo\n']
-
-            >>> mock('vim.mocked_eval', returns_iter=['1', 'false'])
-            >>> blogit.BlogPost(42).read_body([ 'one', 'two', 'tree', 'four' ])
-            Traceback (most recent call last):
-                ...
-            FilterException
-
+        def read_header__Body(self, text):
+            """
+            >>> mock('BlogIt.BlogPost.format', returns='text', tracker=None)
+            >>> p = BlogIt.BlogPost('')
+            >>> p.read_header__Body('text'); p.new_post_data
+            {'description': 'text'}
             >>> minimock.restore()
             """
-            text = super(BlogIt.BlogPost, self).read_body(lines)
-            return map(self.format, text.split('\n<!--more-->\n\n'))
-
-        def read_post(self, lines):
-            d = super(BlogIt.BlogPost, self).read_post(lines)
-            body = d[self.POST_BODY]
-            d[self.POST_BODY] = body[0]
-            if len(body) == 2:
-                d['mt_text_more'] = body[1]
-            return d
+            L = map(self.format, text.split('\n<!--more-->\n\n'))
+            #super(BlogIt.BlogPost, self).read_header__Body(L[0])
+            BlogIt.AbstractPost.read_header_default(self, 'Body', L[0])
+            if len(L) == 2:
+                self.read_header__Body_mt_more(L[1])
 
         def unformat(self, text):
             r"""
@@ -558,6 +674,32 @@ class BlogIt(object):
                 return e.input_text
 
         def format(self, text):
+            r"""
+
+            Can raise FilterException.
+
+            >>> mock('vim.mocked_eval')
+
+            >>> blogit.BlogPost(42).format('one\ntwo\ntree\nfour')
+            Called vim.mocked_eval("exists('blogit_format')")
+            Called vim.mocked_eval("exists('blogit_postsource')")
+            'one\ntwo\ntree\nfour'
+
+            >>> mock('vim.mocked_eval', returns_iter=['1', 'sort', '0'])
+            >>> blogit.BlogPost(42).format('one\ntwo\ntree\nfour')
+            Called vim.mocked_eval("exists('blogit_format')")
+            Called vim.mocked_eval('blogit_format')
+            Called vim.mocked_eval("exists('blogit_postsource')")
+            'four\none\ntree\ntwo\n'
+
+            >>> mock('vim.mocked_eval', returns_iter=['1', 'false'])
+            >>> blogit.BlogPost(42).format('one\ntwo\ntree\nfour')
+            Traceback (most recent call last):
+                ...
+            FilterException
+
+            >>> minimock.restore()
+            """
             formated = self.filter(text, 'format')
             if self.vim_vars.blog_postsource:
                 formated = "<!--blogit--\n%s\n--blogit-->\n%s" % ( text, formated )
@@ -621,7 +763,7 @@ class BlogIt(object):
             except Exception, e:
                 raise BlogIt.FilterException(e.message, text, filter)
 
-        def format_body(self):
+        def display_body(self):
             """
             Yields the lines of a post body.
             """
@@ -640,11 +782,11 @@ class BlogIt(object):
 
     class WordPressBlogPost(BlogPost):
         def __init__(self, blog_post_id, post_data={}, meta_data_dict=None,
-                     meta_data_f_dict=None, headers=None,
-                     post_body='description', vim_vars=None, client=None):
+                     headers=None, post_body='description', vim_vars=None,
+                     client=None):
             super(BlogIt.WordPressBlogPost, self
                  ).__init__(blog_post_id, post_data, meta_data_dict,
-                            meta_data_f_dict, headers, post_body, vim_vars)
+                            headers, post_body, vim_vars)
             if client is None:
                 client = xmlrpclib.ServerProxy(self.vim_vars.blog_url)
             self.client = client
@@ -676,14 +818,8 @@ class BlogIt(object):
                             self.vim_vars.blog_username,
                             self.vim_vars.blog_password, self.post_data, push)
 
-            def date_from_meta(str_date):
-                if push is None and self.current_post['post_status'] == 'publish':
-                    return BlogIt.str_to_DateTime(str_date)
-                return BlogIt.str_to_DateTime()
-
-            self.meta_data_f_dict['Date'] = date_from_meta
-
-            self.post_data.update(self.read_post(lines))
+            self.read_post(lines)
+            self.post_data.update(self.new_post_data)
             push_dict = { 0: 'draft', 1: 'publish',
                           None: self.post_data['post_status'] }
             self.post_data['post_status'] = push_dict[push]
@@ -737,23 +873,20 @@ class BlogIt(object):
 
 
     class Comment(AbstractPost):
-        def __init__(self, post_data={}, meta_data_dict=None,
-                     meta_data_f_dict=None, headers=None, post_body='content'):
-            if meta_data_f_dict is None:
-                meta_data_f_dict = { 'Date': BlogIt.DateTime_to_str }
+        def __init__(self, post_data={}, meta_data_dict=None, headers=None,
+                     post_body='content'):
             if meta_data_dict is None:
                 meta_data_dict = { 'Status': 'status', 'Author': 'author',
                         'ID': 'comment_id', 'Parent': 'parent',
-                        'Date': 'date_created_gmt', 'Type': 'type',
+                        'Date_AS_DateTime': 'date_created_gmt', 'Type': 'type',
                         'content': 'content',
                         }
             if headers is None:
-                headers = ['Status', 'Author', 'ID',
-                           'Parent', 'Date', 'Type',]
+                headers = ['Status', 'Author', 'ID', 'Parent', 'Date', 'Type']
             super(BlogIt.Comment, self).__init__(post_data, meta_data_dict,
-                     meta_data_f_dict, headers, post_body)
+                     headers, post_body)
 
-        def format_body(self):
+        def display_body(self):
             """
             Yields the lines of a post body.
             """
@@ -766,11 +899,10 @@ class BlogIt(object):
     class CommentList(Comment):
         POST_TYPE = 'comments'
 
-        def __init__(self, meta_data_dict=None,
-                     meta_data_f_dict=None, headers=None, post_body='content',
-                     comment_categories=None):
+        def __init__(self, meta_data_dict=None, headers=None,
+                     post_body='content', comment_categories=None):
             super(BlogIt.CommentList, self).__init__({}, meta_data_dict,
-                     meta_data_f_dict, headers, post_body)
+                     headers, post_body)
             if comment_categories is None:
                 comment_categories = ( 'New', 'In Moderadation', 'Spam',
                                        'Published' )
@@ -780,7 +912,8 @@ class BlogIt(object):
         def init_vim_buffer(self):
             super(BlogIt.CommentList, self).init_vim_buffer()
             vim.command('setlocal linebreak completefunc=BlogItComplete ' +
-                               'foldmethod=marker foldtext=BlogItCommentsFoldText()')
+                               'foldmethod=marker ' +
+                               'foldtext=BlogItCommentsFoldText()')
 
         def empty_comment_list(self):
             self.comment_list = {}
@@ -817,7 +950,6 @@ class BlogIt(object):
             AssertionError
             """
             comment = BlogIt.Comment(comment_dict, self.meta_data_dict,
-                                     self.meta_data_f_dict,
                                      self.HEADERS, self.POST_BODY)
             assert not comment_dict['comment_id'] in self.comment_list
             self.comment_list[comment_dict['comment_id']] = comment
@@ -883,44 +1015,41 @@ class BlogIt(object):
             ...             'Same Text',
             ...     60 * '=', 'ID: 3', 'Status: spam', '', 'Same Again',
             ... ]))      #doctest: +NORMALIZE_WHITESPACE
-            [{'content': 'Changed Text', 'status': u'hold', 'comment_id': '1',
+            [{'content': 'Changed Text', 'status': u'hold', 'comment_id': u'1',
               'unknown': 'tag'},
              {'status': u'hold', 'content': 'New Text', 'parent': '0',
-              'author': '', 'type': '', 'comment_id': '',
+              'author': '', 'type': '', 'comment_id': u'',
               'date_created_gmt': ''},
-             {'content': 'Same Again', 'status': u'spam', 'comment_id': '3'}]
+             {'content': 'Same Again', 'status': u'spam', 'comment_id': u'3'}]
+
             """
-            ignored_tags = set([ 'ID', 'Date' ])
 
             for comment in self.read_post(lines):
-                original_comment = self.comment_list[comment['ID']].post_data
+                original_comment = self.comment_list[comment['comment_id']].post_data
                 updated_comment = original_comment.copy()
                 for t in comment.keys():
-                    if t in ignored_tags:
-                        continue
-                    updated_comment[self.meta_data_dict[t]] = comment[t]
+                    updated_comment[t] = comment[t]
                 if original_comment != updated_comment:
                     yield updated_comment
 
         def read_post(self, lines):
             r""" Yields a dict for each comment in the current buffer.
 
-            >>> list(BlogIt.CommentList().read_post([
+            >>> list(BlogIt.CommentList(headers=['Tag', 'Tag2']).read_post([
             ...     60 * '=', 'Tag2: Val2 ', '',
             ...     60 * '=',
             ...     'Tag:  Value  ', '', 'Some Text', 'in two lines.   ',
             ... ]))    #doctest: +NORMALIZE_WHITESPACE
             [{'content': '', 'Tag2': u'Val2'},
              {'content': 'Some Text\nin two lines.', 'Tag': u'Value'}]
-            >>> list(BlogIt.CommentList().read_post([
+            >>> list(BlogIt.CommentList(meta_data_dict={'ID': 'ID',
+            ...             'Status': 'Status'}).read_post([
             ...     60 * '=', 'ID: 1 ', 'Status: hold', '', 'Text',
             ...     60 * '=', 'ID:  ', 'Status: hold', '', 'Text',
-            ...     60 * '=', 'ID: 2', 'Status: hold', 'Date: new', '', 'Text',
             ...     60 * '=', 'ID: 3', 'Status: spam', '', 'Text',
             ... ]))      #doctest: +NORMALIZE_WHITESPACE
             [{'content': 'Text', 'Status': u'hold', 'ID': u'1'},
              {'content': 'Text', 'Status': u'hold', 'ID': u''},
-             {'content': 'Text', 'Status': u'hold', 'ID': u'2', 'Date': u'new'},
              {'content': 'Text', 'Status': u'spam', 'ID': u'3'}]
             """
             j = 0
@@ -928,9 +1057,11 @@ class BlogIt(object):
             for i, line in enumerate(lines):
                 if line.startswith(60 * '='):
                     if i-j > 1:
+                        self.new_post_data = {}
                         yield super(BlogIt.CommentList, self).read_post(
                                 lines[j:i])
                     j = i + 1
+            self.new_post_data = {}
             yield super(BlogIt.CommentList, self).read_post(lines[j:])
 
         @classmethod
@@ -939,12 +1070,11 @@ class BlogIt(object):
 
 
     class WordPressCommentList(CommentList):
-        def __init__(self, blog_post_id, meta_data_dict=None,
-                     meta_data_f_dict=None, headers=None, post_body='content',
-                     vim_vars=None, client=None, comment_categories=None):
+        def __init__(self, blog_post_id, meta_data_dict=None, headers=None,
+                     post_body='content', vim_vars=None, client=None,
+                     comment_categories=None):
             super(BlogIt.WordPressCommentList, self).__init__(
-                    meta_data_dict, meta_data_f_dict, headers, post_body,
-                    comment_categories)
+                    meta_data_dict, headers, post_body, comment_categories)
             if vim_vars is None:
                 vim_vars = BlogIt.VimVars()
             self.vim_vars = vim_vars

@@ -1172,7 +1172,7 @@ class BlogIt(object):
             if list(self.changed_comments(self.display())) != []:
                 msg = 'Bug in BlogIt: Deactivating comment editing:\n'
                 for d in self.changed_comments(self.display()):
-                    msg += '  %s' % d['comment_id']
+                    msg += "  '%s'" % d['comment_id']
                     #msg += str(list(self.changed_comments()))
                 self.send = self._no_send
                 raise BlogIt.BlogItBug(msg)
@@ -1265,7 +1265,7 @@ class BlogIt(object):
             except BlogIt.BlogItBug, e:
                 p.init_vim_buffer()
                 vim.command('setlocal nomodifiable')
-                sys.stderr.write(e.msg)
+                sys.stderr.write(e.message)
             else:
                 p.init_vim_buffer()
 

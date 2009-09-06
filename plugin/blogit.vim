@@ -88,6 +88,7 @@ from subprocess import Popen, CalledProcessError, PIPE
 from xmlrpclib import DateTime, Fault, MultiCall
 from inspect import getargspec
 import webbrowser, tempfile
+import warnings
 
 try:
     import vim
@@ -98,6 +99,8 @@ except ImportError:
     from mock_vim import vim
 else:
     doctest = None
+
+warnings.simplefilter('always', UnicodeWarning)
 
 #####################
 # Do not edit below #
@@ -1322,6 +1325,10 @@ class BlogIt(object):
         if text == '':
             return DateTime('')
         else:
+            try:
+                text = text.encode(getpreferredencoding())
+            except UnicodeDecodeError:
+                text = text.decode('utf-8').encode(getpreferredencoding())
             text = strptime(text, format)
         return DateTime(strftime('%Y%m%dT%H:%M:%S', gmtime(mktime(text))))
 

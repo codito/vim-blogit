@@ -895,6 +895,14 @@ class BlogIt(object):
                 # not splitlines to preserve \r\n in comments.
                 yield line
 
+        @classmethod
+        def create_emtpy_comment(cls):
+            c = cls()
+            c.read_post([ 'Status: new', 'Author: ', 'ID: ', 'Parent: 0',
+                          'Date: ', 'Type: ', '', ''])
+            c.post_data = c.new_post_data
+            return c
+
 
     class CommentList(Comment):
         POST_TYPE = 'comments'
@@ -918,11 +926,8 @@ class BlogIt(object):
         def empty_comment_list(self):
             self.comment_list = {}
             self.comments_by_category = {}
-            self.add_comment('New', {'status': 'new', 'author': '',
-                                     'comment_id': '', 'parent': '0',
-                                     'date_created_gmt': '', 'type': '',
-                                     'content': ''
-                                    })
+            self.add_comment('New',
+                    BlogIt.Comment.create_emtpy_comment().post_data)
 
         def add_comment(self, category, comment_dict):
             """ Callee must garanty that no comment with same id is in list.
@@ -932,16 +937,16 @@ class BlogIt(object):
             ...                         'content': 'Some Text',
             ...                         'status': 'hold'})
             >>> [ (id, c.post_data) for id, c in cl.comment_list.iteritems()
-            ... ]    #doctest: +NORMALIZE_WHITESPACE
-            [('', {'status': 'new', 'parent': '0', 'author': '',
-              'comment_id': '', 'date_created_gmt': '', 'content': '',
-              'type': ''}),
+            ... ]    #doctest: +NORMALIZE_WHITESPACE +ELLIPSIS
+            [(u'', {'status': u'new', 'parent': u'0', 'author': u'',
+              'comment_id': u'', 'date_created_gmt': <DateTime '' at ...>,
+              'content': '', 'type': u''}),
              ('1',
              {'content': 'Some Text', 'status': 'hold', 'comment_id': '1'})]
             >>> [ (cat, [ c.post_data['comment_id'] for c in L ])
             ...         for cat, L in cl.comments_by_category.iteritems()
             ... ]    #doctest: +NORMALIZE_WHITESPACE
-            [('New', ['']), ('hold', ['1'])]
+            [('New', [u'']), ('hold', ['1'])]
             >>> cl.add_comment('spam', {'comment_id': '1'}
             ...               )    #doctest: +ELLIPSIS
             Traceback (most recent call last):
@@ -1014,12 +1019,12 @@ class BlogIt(object):
             ...     60 * '=', 'ID: 2', 'Status: hold', 'Date: new', '',
             ...             'Same Text',
             ...     60 * '=', 'ID: 3', 'Status: spam', '', 'Same Again',
-            ... ]))      #doctest: +NORMALIZE_WHITESPACE
+            ... ]))      #doctest: +NORMALIZE_WHITESPACE +ELLIPSIS
             [{'content': 'Changed Text', 'status': u'hold', 'comment_id': u'1',
               'unknown': 'tag'},
-             {'status': u'hold', 'content': 'New Text', 'parent': '0',
-              'author': '', 'type': '', 'comment_id': u'',
-              'date_created_gmt': ''},
+             {'status': u'hold', 'content': 'New Text', 'parent': u'0',
+              'author': u'', 'type': u'', 'comment_id': u'',
+              'date_created_gmt': <DateTime '' at ...>},
              {'content': 'Same Again', 'status': u'spam', 'comment_id': u'3'}]
 
             """
@@ -1173,7 +1178,7 @@ class BlogIt(object):
                 msg = 'Bug in BlogIt: Deactivating comment editing:\n'
                 for d in self.changed_comments(self.display()):
                     msg += "  '%s'" % d['comment_id']
-                    #msg += str(list(self.changed_comments()))
+                    msg += str(list(self.changed_comments(self.display())))
                 self.send = self._no_send
                 raise BlogIt.BlogItBug(msg)
 
@@ -1315,7 +1320,7 @@ class BlogIt(object):
         <DateTime '20090628T17:38:58' at ...>
         """
         if text == '':
-            text = localtime()
+            return DateTime('')
         else:
             text = strptime(text, format)
         return DateTime(strftime('%Y%m%dT%H:%M:%S', gmtime(mktime(text))))

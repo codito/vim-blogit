@@ -506,9 +506,17 @@ class BlogIt(object):
 
             >>> BlogIt.AbstractPost().get_server_var_default('foo')
             '<foo>'
+            >>> BlogIt.AbstractPost().get_server_var_default('foo_AS_bar'
+            ... )     #doctest: +ELLIPSIS
+            Traceback (most recent call last):
+                ...
+            BlogItServerVarUndefined: Unknown: foo_AS_bar.
             """
             try:
-                return self.post_data[self.meta_data_dict[label]]
+                try:
+                    return self.post_data[self.meta_data_dict[label]]
+                except KeyError:
+                    return self.post_data[label]
             except KeyError:
                 if '_AS_' in label:
                     raise self.BlogItServerVarUndefined(label)
@@ -527,6 +535,8 @@ class BlogIt(object):
             ...                     {'Tags_AS_list': 'a'}
             ...                    ).display_header('Tags')
             'Tags: one, two, three'
+            >>> blogit.AbstractPost({}).display_header('Tags')
+            'Tags: <Tags>'
             """
             try:
                 val = getattr(self, 'get_server_var__%s_AS_%s' % (
@@ -625,15 +635,6 @@ class BlogIt(object):
                 s = u' (%s)' % ', '.join(comment_typ_count)
             return ( u'%(post_status)s \u2013 %(total_comments)s Comments'
                     + s ) % d
-
-        @classmethod
-        def create_new_post(cls, vim_vars, body_lines=['']):
-            b = cls('', vim_vars=vim_vars)
-            b.post_data.update({'post_status': 'draft', 'description': '',
-                    'wp_author_display_name': b.vim_vars.blog_username})
-            b.init_vim_buffer()
-            vim.current.buffer[-1:] = body_lines
-            return b
 
         def init_vim_buffer(self):
             super(BlogIt.BlogPost, self).init_vim_buffer()
@@ -890,6 +891,29 @@ class BlogIt(object):
             d['blogit_status'] = comments
             self.post_data = d
 
+        @classmethod
+        def create_new_post(cls, vim_vars, body_lines=['']):
+            """
+            >>> mock('vim.command', tracker=None)
+            >>> mock('vim.mocked_eval', tracker=None)
+            >>> BlogIt.WordPressBlogPost.create_new_post(BlogIt.VimVars()
+            ... )     #doctest: +ELLIPSIS
+            <__main__.WordPressBlogPost object at 0x...>
+            >>> minimock.restore()
+            """
+            b = cls('', post_data={'post_status': 'draft', 'description': '',
+                    'wp_author_display_name': vim_vars.blog_username,
+                    'postid': '', 'categories': [], 'mt_keywords': '',
+                    'date_created_gmt': '', 'title': '',
+                    'Status_AS_dict': {'awaiting_moderation': 0, 'spam': 0,
+                                       'post_status': 'draft',
+                                       'total_comments': 0, }},
+                    vim_vars=vim_vars)
+            b.init_vim_buffer()
+            if body_lines != ['']:
+                vim.current.buffer[-1:] = body_lines
+            return b
+
 
     class Page(BlogPost):
         POST_TYPE = 'page'
@@ -972,6 +996,29 @@ class BlogIt(object):
             comments['post_status'] = d['page_status']
             d['blogit_status'] = comments
             self.post_data = d
+
+        @classmethod
+        def create_new_post(cls, vim_vars, body_lines=['']):
+            """
+            >>> mock('vim.command', tracker=None)
+            >>> mock('vim.mocked_eval', tracker=None)
+            >>> BlogIt.WordPressPage.create_new_post(BlogIt.VimVars()
+            ... )     #doctest: +ELLIPSIS
+            <__main__.WordPressPage object at 0x...>
+            >>> minimock.restore()
+            """
+            b = cls('', post_data={'page_status': 'draft', 'description': '',
+                    'wp_author_display_name': vim_vars.blog_username,
+                    'page_id': '', 'wp_slug': '', 'title': '',
+                    'categories': [], 'dateCreated': '',
+                    'Status_AS_dict': {'awaiting_moderation': 0, 'spam': 0,
+                                       'post_status': 'draft',
+                                       'total_comments': 0 }},
+                    vim_vars=vim_vars)
+            b.init_vim_buffer()
+            if body_lines != ['']:
+                vim.current.buffer[-1:] = body_lines
+            return b
 
 
     class Comment(AbstractPost):
@@ -1545,7 +1592,11 @@ class BlogIt(object):
         try:
             id = int(id)
         except ValueError:
-            sys.stderr.write("'id' must be an integer value.")
+            if id in [ 'this', 'new' ]:
+                self.command(id, blog)
+                return
+            sys.stderr.write(
+                    "'id' must be an integer value or 'this' or 'new'.")
             return
 
         post = BlogIt.WordPressBlogPost(id, vim_vars=vim_vars)
@@ -1563,21 +1614,31 @@ class BlogIt(object):
         """ edit a page """
         # copied from command_edit
         vim_vars = self.get_vim_vars(blog)
-        try:
-            id = int(id)
-        except ValueError:
-            sys.stderr.write("'id' must be an integer value.")
-            return
 
-        post = BlogIt.WordPressPage(id, vim_vars=vim_vars)
-        try:
-            post.getPost()
-        except Fault, e:
-            sys.stderr.write('Blogit Fault: ' + e.faultString)
+        if id == 'new':
+            vim.command('enew')
+            post = BlogIt.WordPressPage.create_new_post(vim_vars)
+        elif id == 'this':
+            if self.current_post is not self.NO_POST:
+                sys.stderr.write("Already editing a post.")
+                return
+            post = BlogIt.WordPressPage.create_new_post(vim_vars,
+                                                        vim.buffer[:])
         else:
+            try:
+                id = int(id)
+            except ValueError:
+                sys.stderr.write("'id' must be an integer value or 'new'.")
+                return
+            post = BlogIt.WordPressPage(id, vim_vars=vim_vars)
+            try:
+                post.getPost()
+            except Fault, e:
+                sys.stderr.write('Blogit Fault: ' + e.faultString)
+                return
             vim.command('enew')
             post.init_vim_buffer()
-            self.current_post = post
+        self.current_post = post
 
     @vimcommand
     def command_commit(self):

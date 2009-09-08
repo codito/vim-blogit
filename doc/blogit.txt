@@ -25,7 +25,9 @@ B. Links                |blogit-links|
         Opens the post {id} for edition.
 
 :Blogit page {id}                   *:Blogit-edit*
-        Opens the page {id} for edition (e.g. the about page).
+        Opens the page {id} for edition.  If {id} is 'new' or 'this' it haves
+        like those commands for posts.  An example for a common page is the
+        about page.
 
 :Blogit commit                      *:Blogit-commit*
         Saves the article to the blog.

@@ -22,7 +22,7 @@
 
 
 runtime! passwords.vim
-command! -nargs=* Blogit exec('py blogit.command(<f-args>)')
+command! -bang -nargs=* Blogit exec('py blogit.command(<f-args>, bang="<bang>")')
 
 let s:used_categories = []
 let s:used_tags = []
@@ -257,8 +257,8 @@ class BlogIt(object):
             vim.command('setlocal buftype=nofile bufhidden=wipe nobuflisted ' +
                     'noswapfile syntax=blogsyntax nomodifiable nowrap')
             vim.current.window.cursor = (2, 0)
-            vim.command('nnoremap <buffer> <enter> :py blogit.list_edit()<cr>')
-            vim.command('nnoremap <buffer> gf :py blogit.list_edit()<cr>')
+            vim.command('nnoremap <buffer> <enter> :Blogit! list_edit<cr>')
+            vim.command('nnoremap <buffer> gf :Blogit! list_edit<cr>')
 
         def display(self):
             """ Yields the rows of a table displaying the posts (at least one).
@@ -309,6 +309,14 @@ class BlogIt(object):
             for row_group, response in zip(self.row_groups, multicall()):
                 row_group.getPost(response)
 
+        def open_row(self, n):
+            n -= 2    # Table header & vim_buffer lines start at 1
+            for row_group in self.row_groups:
+                if n < len(row_group.post_data):
+                    return row_group.open_row(n)
+                else:
+                    n -= len(row_group.post_data)
+
 
     class AbstractPostListingSource(object):
         def __init__(self, id_date_title_tags, vim_vars):
@@ -344,6 +352,10 @@ class BlogIt(object):
             multicall.metaWeblog.getRecentPosts('',
                     self.vim_vars.blog_username, self.vim_vars.blog_password)
 
+        def open_row(self, n):
+            id = self.post_data[n]['postid']
+            return BlogIt.WordPressBlogPost(id, vim_vars=self.vim_vars)
+
 
     class WordPressPostListingPages(AbstractPostListingSource):
         def __init__(self, vim_vars):
@@ -353,6 +365,10 @@ class BlogIt(object):
         def xmlrpc_call__getPost(self, multicall):
             multicall.wp.getPageList('',
                     self.vim_vars.blog_username, self.vim_vars.blog_password)
+
+        def open_row(self, n):
+            id = self.post_data[n]['page_id']
+            return BlogIt.WordPressPage(id, vim_vars=self.vim_vars)
 
 
     class AbstractPost(AbstractBufferIO):
@@ -621,7 +637,7 @@ class BlogIt(object):
 
         def init_vim_buffer(self):
             super(BlogIt.BlogPost, self).init_vim_buffer()
-            vim.command('nnoremap <buffer> gf :py blogit.list_comments()<cr>')
+            vim.command('nnoremap <buffer> gf :Blogit list_comments<cr>')
             vim.command('setlocal ft=mail textwidth=0 ' +
                                  'completefunc=BlogItComplete')
             vim.current.window.cursor = (8, 0)
@@ -876,6 +892,8 @@ class BlogIt(object):
 
 
     class Page(BlogPost):
+        POST_TYPE = 'page'
+
         def __init__(self, blog_post_id, post_data={}, meta_data_dict={},
                      headers=None, post_body='description', vim_vars=None,
                      client=None):
@@ -1311,7 +1329,7 @@ class BlogIt(object):
 
     vimcommand_help = []
 
-    def command(self, command='help', *args):
+    def command(self, command='help', *args, **dic):
         """
         >>> mock('xmlrpclib')
         >>> mock('sys.stderr')
@@ -1331,11 +1349,23 @@ class BlogIt(object):
         Called sys.stderr.write('Ambiguious command mo:
                 mockambiguous, mocktest.')
 
+        >>> mock('blogit.list_edit')
+        >>> blogit.command('list_edit', bang='!')
+        Called blogit.list_edit()
+
         >>> minimock.restore()
         """
         def f(x): return x.startswith('command_' + command)
         matching_commands = filter(f, dir(self))
 
+        try:
+            if dic['bang'] == '!':
+                # Workaround limit to access vim s:variables when
+                # called via :python.
+                getattr(self, command)()
+                return
+        except KeyError:
+            pass
         if len(matching_commands) == 0:
             sys.stderr.write("No such command: %s." % command)
         elif len(matching_commands) == 1:
@@ -1371,35 +1401,13 @@ class BlogIt(object):
                 p.init_vim_buffer()
 
     def list_edit(self):
-        """
-        >>> mock('vim.command')
-        >>> vim.current.window.cursor = (1, 2)
-        >>> vim.current.buffer[:] = [ '12 random text' ]
-        >>> blogit.list_edit()
-        Called vim.command('bdelete')
-        Called vim.command('Blogit edit 12 blogit')
-
-        >>> vim.current.buffer[:] = [ 'no blog id 12' ]
-        >>> mock('blogit.command_new')
-        >>> blogit.list_edit()
-        Called vim.command('bdelete')
-        Called blogit.command_new()
-
-        >>> minimock.restore()
-        """
         row, col = vim.current.window.cursor
-        id = vim.current.buffer[row-1].split()[0]
-        try:
-            id = int(id)
-        except ValueError:
-            vim.command('bdelete')
-            self.command_new()
-        else:
-            blog_name = self.current_post.vim_vars.blog_name
-            vim.command('bdelete')
-            # To access vim s:variables we can't call this directly
-            # via command_edit
-            vim.command('Blogit edit %s %s' % ( id, blog_name ))
+        post = self.current_post.open_row(row)
+        post.getPost()
+        vim.command('bdelete')
+        vim.command('enew')
+        post.init_vim_buffer()
+        self.current_post = post
 
     @staticmethod
     def str_to_DateTime(text='', format='%c'):

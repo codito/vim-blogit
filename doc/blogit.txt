@@ -22,7 +22,10 @@ B. Links                |blogit-links|
         Make current buffer a blog post.
 
 :Blogit edit {id}                   *:Blogit-edit*
-        Opens the article {id} for edition.
+        Opens the post {id} for edition.
+
+:Blogit page {id}                   *:Blogit-edit*
+        Opens the page {id} for edition (e.g. the about page).
 
 :Blogit commit                      *:Blogit-commit*
         Saves the article to the blog.

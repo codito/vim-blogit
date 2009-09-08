@@ -1212,17 +1212,16 @@ class BlogIt(object):
             username, password = self.vim_vars.blog_username, self.vim_vars.blog_password
             multicall_log = []
             for comment in self.changed_comments(lines):
-                if comment['status'] == 'new':
-                    comment['status'] = 'approve'
+                if comment.get_server_var__Status() == 'new':
+                    comment.set_server_var__Status('approve')
                     multicall.wp.newComment(
                             '', username, password, self.BLOG_POST_ID, comment)
                     multicall_log.append('new')
-                elif comment['status'] == 'rm':
-                    multicall.wp.deleteComment(
-                            '', username, password, comment['comment_id'])
+                elif comment.get_server_var__Status() == 'rm':
+                    multicall.wp.deleteComment('', username, password,
+                                               comment.get_server_var__ID())
                 else:
-                    comment_id = comment['comment_id']
-                    del comment['comment_id']
+                    comment_id = comment.get_server_var__ID()
                     multicall.wp.editComment(
                             '', username, password, comment_id, comment)
                     multicall_log.append(comment_id)

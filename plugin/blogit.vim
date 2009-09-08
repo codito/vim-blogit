@@ -583,17 +583,8 @@ class BlogIt(object):
     class BlogPost(AbstractPost):
         POST_TYPE = 'post'
 
-        def __init__(self, blog_post_id, post_data={}, meta_data_dict=None,
+        def __init__(self, blog_post_id, post_data={}, meta_data_dict={},
                      headers=None, post_body='description', vim_vars=None):
-            if meta_data_dict is None:
-                meta_data_dict = {'From': 'wp_author_display_name',
-                                  'Id': 'postid',
-                                  'Subject': 'title',
-                                  'Categories_AS_list': 'categories',
-                                  'Tags': 'mt_keywords',
-                                  'Date_AS_DateTime': 'date_created_gmt',
-                                  'Status_AS_dict': 'blogit_status',
-                                 }
             if headers is None:
                 headers = ['From', 'Id', 'Subject', 'Status',
                            'Categories', 'Tags', 'Date' ]
@@ -787,6 +778,15 @@ class BlogIt(object):
         def __init__(self, blog_post_id, post_data={}, meta_data_dict=None,
                      headers=None, post_body='description', vim_vars=None,
                      client=None):
+            if meta_data_dict is None:
+                meta_data_dict = {'From': 'wp_author_display_name',
+                                  'Id': 'postid',
+                                  'Subject': 'title',
+                                  'Categories_AS_list': 'categories',
+                                  'Tags': 'mt_keywords',
+                                  'Date_AS_DateTime': 'date_created_gmt',
+                                  'Status_AS_dict': 'blogit_status',
+                                 }
             super(BlogIt.WordPressBlogPost, self
                  ).__init__(blog_post_id, post_data, meta_data_dict,
                             headers, post_body, vim_vars)
@@ -876,14 +876,8 @@ class BlogIt(object):
 
 
     class Comment(AbstractPost):
-        def __init__(self, post_data={}, meta_data_dict=None, headers=None,
+        def __init__(self, post_data={}, meta_data_dict={}, headers=None,
                      post_body='content'):
-            if meta_data_dict is None:
-                meta_data_dict = { 'Status': 'status', 'Author': 'author',
-                        'ID': 'comment_id', 'Parent': 'parent',
-                        'Date_AS_DateTime': 'date_created_gmt', 'Type': 'type',
-                        'content': 'content',
-                        }
             if headers is None:
                 headers = ['Status', 'Author', 'ID', 'Parent', 'Date', 'Type']
             super(BlogIt.Comment, self).__init__(post_data, meta_data_dict,
@@ -899,8 +893,8 @@ class BlogIt(object):
                 yield line
 
         @classmethod
-        def create_emtpy_comment(cls):
-            c = cls()
+        def create_emtpy_comment(cls, *a, **d):
+            c = cls(*a, **d)
             c.read_post([ 'Status: new', 'Author: ', 'ID: ', 'Parent: 0',
                           'Date: ', 'Type: ', '', ''])
             c.post_data = c.new_post_data
@@ -910,7 +904,7 @@ class BlogIt(object):
     class CommentList(Comment):
         POST_TYPE = 'comments'
 
-        def __init__(self, meta_data_dict=None, headers=None,
+        def __init__(self, meta_data_dict={}, headers=None,
                      post_body='content', comment_categories=None):
             super(BlogIt.CommentList, self).__init__({}, meta_data_dict,
                      headers, post_body)
@@ -929,28 +923,27 @@ class BlogIt(object):
         def empty_comment_list(self):
             self.comment_list = {}
             self.comments_by_category = {}
-            self.add_comment('New',
-                    BlogIt.Comment.create_emtpy_comment().post_data)
+            self.add_comment('New', BlogIt.Comment.create_emtpy_comment(
+                    {}, self.meta_data_dict, self.HEADERS, self.POST_BODY
+            ).post_data)
 
         def add_comment(self, category, comment_dict):
             """ Callee must garanty that no comment with same id is in list.
 
             >>> cl = BlogIt.CommentList()
-            >>> cl.add_comment('hold', {'comment_id': '1',
+            >>> cl.add_comment('hold', {'ID': '1',
             ...                         'content': 'Some Text',
-            ...                         'status': 'hold'})
+            ...                         'Status': 'hold'})
             >>> [ (id, c.post_data) for id, c in cl.comment_list.iteritems()
             ... ]    #doctest: +NORMALIZE_WHITESPACE +ELLIPSIS
-            [(u'', {'status': u'new', 'parent': u'0', 'author': u'',
-              'comment_id': u'', 'date_created_gmt': <DateTime '' at ...>,
-              'content': '', 'type': u''}),
-             ('1',
-             {'content': 'Some Text', 'status': 'hold', 'comment_id': '1'})]
-            >>> [ (cat, [ c.post_data['comment_id'] for c in L ])
+            [(u'', {'Status': u'new', 'Parent': u'0', 'Author': u'',
+              'content': '', 'Date': u'', 'Type': u'', 'ID': u''}),
+             ('1', {'content': 'Some Text', 'Status': 'hold', 'ID': '1'})]
+            >>> [ (cat, [ c.post_data['ID'] for c in L ])
             ...         for cat, L in cl.comments_by_category.iteritems()
             ... ]    #doctest: +NORMALIZE_WHITESPACE
             [('New', [u'']), ('hold', ['1'])]
-            >>> cl.add_comment('spam', {'comment_id': '1'}
+            >>> cl.add_comment('spam', {'ID': '1'}
             ...               )    #doctest: +ELLIPSIS
             Traceback (most recent call last):
                 ...
@@ -959,8 +952,8 @@ class BlogIt(object):
             """
             comment = BlogIt.Comment(comment_dict, self.meta_data_dict,
                                      self.HEADERS, self.POST_BODY)
-            assert not comment_dict['comment_id'] in self.comment_list
-            self.comment_list[comment_dict['comment_id']] = comment
+            assert not comment.get_server_var__ID() in self.comment_list
+            self.comment_list[comment.get_server_var__ID()] = comment
             try:
                 self.comments_by_category[category].append(comment)
             except KeyError:
@@ -998,79 +991,90 @@ class BlogIt(object):
                         fold = fold_levels[comment.post_data['parent']] + 2
                     except KeyError:
                         fold = 2
-                    fold_levels[comment.post_data['comment_id']] = fold
+                    fold_levels[comment.get_server_var__ID()] = fold
                     yield 72 * '=' + ' {{{%s' % fold
                     for line in comment.display():
                         yield line
                     yield ''
 
-        def changed_comments(self, lines):
-            """ Yields comments with changes made to in the vim buffer.
-
-            >>> c = BlogIt.CommentList()
-            >>> for comment_dict in [
-            ...         {'comment_id': '1', 'content': 'Old Text',
-            ...          'status': 'hold', 'unknown': 'tag'},
-            ...         {'comment_id': '2', 'content': 'Same Text',
-            ...          'Date': 'old', 'status': 'hold'},
-            ...         {'comment_id': '3', 'content': 'Same Again',
-            ...          'status': 'hold'}]:
-            ...     c.add_comment('', comment_dict)
-            >>> list(c.changed_comments([
-            ...     60 * '=', 'ID: 1 ', 'Status: hold', '', 'Changed Text',
-            ...     60 * '=', 'ID:  ', 'Status: hold', '', 'New Text',
-            ...     60 * '=', 'ID: 2', 'Status: hold', 'Date: new', '',
-            ...             'Same Text',
-            ...     60 * '=', 'ID: 3', 'Status: spam', '', 'Same Again',
-            ... ]))      #doctest: +NORMALIZE_WHITESPACE +ELLIPSIS
-            [{'content': 'Changed Text', 'status': u'hold', 'comment_id': u'1',
-              'unknown': 'tag'},
-             {'status': u'hold', 'content': 'New Text', 'parent': u'0',
-              'author': u'', 'type': u'', 'comment_id': u'',
-              'date_created_gmt': <DateTime '' at ...>},
-             {'content': 'Same Again', 'status': u'spam', 'comment_id': u'3'}]
-
-            """
-
-            for comment in self.read_post(lines):
-                original_comment = self.comment_list[comment['comment_id']].post_data
-                updated_comment = original_comment.copy()
-                for t in comment.keys():
-                    updated_comment[t] = comment[t]
-                if original_comment != updated_comment:
-                    yield updated_comment
+        def _read_post__read_comment(self, lines):
+            self.new_post_data = {}
+            new_post_data = super(BlogIt.CommentList, self).read_post(lines)
+            return BlogIt.Comment(new_post_data, self.meta_data_dict,
+                                  self.HEADERS, self.POST_BODY)
 
         def read_post(self, lines):
             r""" Yields a dict for each comment in the current buffer.
 
-            >>> list(BlogIt.CommentList(headers=['Tag', 'Tag2']).read_post([
-            ...     60 * '=', 'Tag2: Val2 ', '',
-            ...     60 * '=',
-            ...     'Tag:  Value  ', '', 'Some Text', 'in two lines.   ',
-            ... ]))    #doctest: +NORMALIZE_WHITESPACE
-            [{'content': '', 'Tag2': u'Val2'},
-             {'content': 'Some Text\nin two lines.', 'Tag': u'Value'}]
-            >>> list(BlogIt.CommentList(meta_data_dict={'ID': 'ID',
-            ...             'Status': 'Status'}).read_post([
+            >>> cl = BlogIt.CommentList().read_post([
             ...     60 * '=', 'ID: 1 ', 'Status: hold', '', 'Text',
             ...     60 * '=', 'ID:  ', 'Status: hold', '', 'Text',
-            ...     60 * '=', 'ID: 3', 'Status: spam', '', 'Text',
-            ... ]))      #doctest: +NORMALIZE_WHITESPACE
+            ...     60 * '=', 'ID: 3', 'Status: spam', '', 'Text' ])
+            >>> [ c.post_data for c in cl ]     #doctest: +NORMALIZE_WHITESPACE
             [{'content': 'Text', 'Status': u'hold', 'ID': u'1'},
              {'content': 'Text', 'Status': u'hold', 'ID': u''},
              {'content': 'Text', 'Status': u'spam', 'ID': u'3'}]
+
+            >>> mock('BlogIt.Comment.create_emtpy_comment',
+            ...      returns=BlogIt.Comment(headers=['Tag', 'Tag2']))
+            >>> cl = BlogIt.CommentList(headers=['Tag', 'Tag2']).read_post([
+            ...     60 * '=', 'Tag2: Val2 ', '',
+            ...     60 * '=',
+            ...     'Tag:  Value  ', '', 'Some Text', 'in two lines.   ' ])
+            Called BlogIt.Comment.create_emtpy_comment(
+                {},
+                {'Body': 'content', 'Tag': 'Tag', 'Tag2': 'Tag2'},
+                ['Tag', 'Tag2'],
+                'content')
+            >>> [ c.post_data for c in cl ]     #doctest: +NORMALIZE_WHITESPACE
+            [{'content': '', 'Tag2': u'Val2'},
+             {'content': 'Some Text\nin two lines.', 'Tag': u'Value'}]
+            >>> minimock.restore()
             """
             j = 0
             lines = list(lines)
             for i, line in enumerate(lines):
                 if line.startswith(60 * '='):
                     if i-j > 1:
-                        self.new_post_data = {}
-                        yield super(BlogIt.CommentList, self).read_post(
-                                lines[j:i])
+                        yield self._read_post__read_comment(lines[j:i])
                     j = i + 1
-            self.new_post_data = {}
-            yield super(BlogIt.CommentList, self).read_post(lines[j:])
+            yield self._read_post__read_comment(lines[j:])
+
+        def changed_comments(self, lines):
+            """ Yields comments with changes made to in the vim buffer.
+
+            >>> cl = BlogIt.CommentList()
+            >>> for comment_dict in [
+            ...         {'ID': '1', 'content': 'Old Text',
+            ...          'Status': 'hold', 'unknown': 'tag'},
+            ...         {'ID': '2', 'content': 'Same Text',
+            ...          'Date': 'old', 'Status': 'hold'},
+            ...         {'ID': '3', 'content': 'Same Again',
+            ...          'Status': 'hold'}]:
+            ...     cl.add_comment('', comment_dict)
+            >>> [ c.post_data for c in cl.changed_comments([
+            ...     60 * '=', 'ID: 1 ', 'Status: hold', '', 'Changed Text',
+            ...     60 * '=', 'ID:  ', 'Status: hold', '', 'New Text',
+            ...     60 * '=', 'ID: 2', 'Status: hold', 'Date: new', '',
+            ...             'Same Text',
+            ...     60 * '=', 'ID: 3', 'Status: spam', '', 'Same Again' ])
+            ... ]      #doctest: +NORMALIZE_WHITESPACE +ELLIPSIS
+            [{'content': 'Changed Text', 'Status': u'hold', 'unknown': 'tag',
+              'ID': u'1'},
+             {'Status': u'hold', 'content': 'New Text', 'Parent': u'0',
+              'Author': u'', 'Date': u'', 'Type': u'', 'ID': u''},
+             {'content': 'Same Again', 'Status': u'spam', 'ID': u'3'}]
+
+            """
+
+            for comment in self.read_post(lines):
+                original_comment = self.comment_list[
+                        comment.get_server_var__ID()].post_data
+                new_comment = original_comment.copy()
+                new_comment.update(comment.post_data)
+                if original_comment != new_comment:
+                    comment.post_data = new_comment
+                    yield comment
 
         @classmethod
         def create_from_post(cls, blog_post):
@@ -1081,6 +1085,12 @@ class BlogIt(object):
         def __init__(self, blog_post_id, meta_data_dict=None, headers=None,
                      post_body='content', vim_vars=None, client=None,
                      comment_categories=None):
+            if meta_data_dict is None:
+                meta_data_dict = { 'Status': 'status', 'Author': 'author',
+                        'ID': 'comment_id', 'Parent': 'parent',
+                        'Date_AS_DateTime': 'date_created_gmt', 'Type': 'type',
+                        'content': 'content',
+                        }
             super(BlogIt.WordPressCommentList, self).__init__(
                     meta_data_dict, headers, post_body, comment_categories)
             if vim_vars is None:

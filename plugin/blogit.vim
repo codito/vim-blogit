@@ -875,6 +875,42 @@ class BlogIt(object):
             self.post_data = d
 
 
+    class Page(BlogPost):
+        def read_header__Id(self, text):
+            """
+            >>> mock('BlogIt.BlogPost.set_server_var_default')
+            >>> BlogIt.Page(42).read_header__Id('42 (about)')
+            Called BlogIt.BlogPost.set_server_var_default('Page', 'about')
+            Called BlogIt.BlogPost.set_server_var_default('Id', '42')
+            >>> minimock.restore()
+            """
+            id, page = re.match('(\d+) *\((.*)\)', text).group(1, 2)
+            self.set_server_var__Page(page)
+            #super(BlogIt.Page, self).read_header__Id(id)
+            BlogIt.BlogPost.read_header_default(self, 'Id', id)
+
+        def display_header__Id(self):
+            """
+            >>> mock('BlogIt.BlogPost.get_server_var_default',
+            ...      returns_iter=[42, 'about'], tracker=None)
+            >>> BlogIt.Page(42).display_header__Id()
+            '42 (about)'
+            >>> minimock.restore()
+            """
+            #super(BlogIt.Page, self).display_header__Id()
+            return '%s (%s)' % ( BlogIt.BlogPost.display_header_default(self,
+                                                                        'Id'),
+                                 self.get_server_var__Page() )
+
+
+    class WordPressPage(Page):
+        def send(self, lines, push=None):
+            pass
+
+        def getPost(self):
+            pass
+
+
     class Comment(AbstractPost):
         def __init__(self, post_data={}, meta_data_dict={}, headers=None,
                      post_body='content'):

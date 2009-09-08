@@ -876,6 +876,16 @@ class BlogIt(object):
 
 
     class Page(BlogPost):
+        def __init__(self, blog_post_id, post_data={}, meta_data_dict=None,
+                     headers=None, post_body='description', vim_vars=None,
+                     client=None):
+            if headers is None:
+                headers = ['From', 'Id', 'Subject', 'Status', 'Categories',
+                           'Date' ]
+            super(BlogIt.Page, self).__init__(blog_post_id, post_data,
+                                              meta_data_dict, headers,
+                                              post_body, vim_vars)
+
         def read_header__Id(self, text):
             """
             >>> mock('BlogIt.BlogPost.set_server_var_default')
@@ -904,11 +914,40 @@ class BlogIt(object):
 
 
     class WordPressPage(Page):
+        def __init__(self, blog_post_id, post_data={}, meta_data_dict=None,
+                     headers=None, post_body='description', vim_vars=None,
+                     client=None):
+            if meta_data_dict is None:
+                meta_data_dict = {'From': 'wp_author_display_name',
+                                  'Id': 'page_id',
+                                  'Subject': 'title',
+                                  'Categories_AS_list': 'categories',
+                                  'Date_AS_DateTime': 'dateCreated',
+                                  'Status_AS_dict': 'blogit_status',
+                                  'Page': 'wp_slug'
+                                 }
+            super(BlogIt.WordPressPage, self
+                 ).__init__(blog_post_id, post_data, meta_data_dict,
+                            headers, post_body, vim_vars)
+            if client is None:
+                client = xmlrpclib.ServerProxy(self.vim_vars.blog_url)
+            self.client = client
+
         def send(self, lines, push=None):
-            pass
+            raise NotImplementedError
 
         def getPost(self):
-            pass
+            username = self.vim_vars.blog_username
+            password = self.vim_vars.blog_password
+
+            multicall = xmlrpclib.MultiCall(self.client)
+            multicall.wp.getPage('', self.BLOG_POST_ID, username, password)
+            multicall.wp.getCommentCount('', username, password,
+                                         self.BLOG_POST_ID)
+            d, comments = tuple(multicall())
+            comments['post_status'] = d['page_status']
+            d['blogit_status'] = comments
+            self.post_data = d
 
 
     class Comment(AbstractPost):
@@ -1494,6 +1533,27 @@ class BlogIt(object):
             return
 
         post = BlogIt.WordPressBlogPost(id, vim_vars=vim_vars)
+        try:
+            post.getPost()
+        except Fault, e:
+            sys.stderr.write('Blogit Fault: ' + e.faultString)
+        else:
+            vim.command('enew')
+            post.init_vim_buffer()
+            self.current_post = post
+
+    @vimcommand
+    def command_page(self, id, blog=None):
+        """ edit a page """
+        # copied from command_edit
+        vim_vars = self.get_vim_vars(blog)
+        try:
+            id = int(id)
+        except ValueError:
+            sys.stderr.write("'id' must be an integer value.")
+            return
+
+        post = BlogIt.WordPressPage(id, vim_vars=vim_vars)
         try:
             post.getPost()
         except Fault, e:

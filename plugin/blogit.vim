@@ -552,7 +552,7 @@ class BlogIt(object):
         def get_server_var__Categories(self):
             return self.get_server_var_different_type('Categories', 'list')
 
-        def set_server_var__Categories(self):
+        def set_server_var__Categories(self, val):
             self.set_server_var_different_type('Categories', 'list', val)
 
         def get_server_var__Tags(self):

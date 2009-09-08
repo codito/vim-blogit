@@ -876,7 +876,7 @@ class BlogIt(object):
 
 
     class Page(BlogPost):
-        def __init__(self, blog_post_id, post_data={}, meta_data_dict=None,
+        def __init__(self, blog_post_id, post_data={}, meta_data_dict={},
                      headers=None, post_body='description', vim_vars=None,
                      client=None):
             if headers is None:
@@ -933,8 +933,14 @@ class BlogIt(object):
                 client = xmlrpclib.ServerProxy(self.vim_vars.blog_url)
             self.client = client
 
-        def send(self, lines, push=None):
-            raise NotImplementedError
+        def send(self, lines):
+            self.read_post(lines)
+            self.post_data.update(self.new_post_data)
+            self.client.wp.editPage('', self.BLOG_POST_ID,
+                                    self.vim_vars.blog_username,
+                                    self.vim_vars.blog_password,
+                                    self.post_data)
+            self.getPost()
 
         def getPost(self):
             username = self.vim_vars.blog_username
@@ -1183,22 +1189,23 @@ class BlogIt(object):
             >>> mock('sys.stderr')
             >>> mock('c.getComments')
             >>> mock('c.changed_comments',
-            ...         returns=[ { 'status': 'new', 'content': 'New Text' },
-            ...             { 'status': 'will fail', 'comment_id': 13 },
-            ...             { 'status': 'will succeed', 'comment_id': 7 },
-            ...             { 'status': 'rm', 'comment_id': 100 } ])
+            ...         returns=[ BlogIt.Comment(post_data, c.meta_data_dict)
+            ...             for post_data in
+            ...                 { 'status': 'new', 'content': 'New Text' },
+            ...                 { 'status': 'will fail', 'comment_id': 13 },
+            ...                 { 'status': 'will succeed', 'comment_id': 7 },
+            ...                 { 'status': 'rm', 'comment_id': 100 } ])
             >>> mock('xmlrpclib.MultiCall', returns=Mock(
             ...         'multicall', returns=[ 200, False, True, True ]))
             >>> c.send(None)    #doctest: +NORMALIZE_WHITESPACE
             Called xmlrpclib.MultiCall(<ServerProxy for example.com/RPC2>)
             Called c.changed_comments(None)
-            Called multicall.wp.newComment(
-                '', 'user', 'password', 42,
+            Called multicall.wp.newComment( '', 'user', 'password', 42,
                 {'status': 'approve', 'content': 'New Text'})
-            Called multicall.wp.editComment(
-                '', 'user', 'password', 13, {'status': 'will fail'})
-            Called multicall.wp.editComment(
-                '', 'user', 'password', 7, {'status': 'will succeed'})
+            Called multicall.wp.editComment( '', 'user', 'password', 13,
+                {'status': 'will fail', 'comment_id': 13})
+            Called multicall.wp.editComment( '', 'user', 'password', 7,
+                 {'status': 'will succeed', 'comment_id': 7})
             Called multicall.wp.deleteComment('', 'user', 'password', 100)
             Called multicall()
             Called sys.stderr.write('Server refuses update to 13.')
@@ -1214,16 +1221,18 @@ class BlogIt(object):
             for comment in self.changed_comments(lines):
                 if comment.get_server_var__Status() == 'new':
                     comment.set_server_var__Status('approve')
-                    multicall.wp.newComment(
-                            '', username, password, self.BLOG_POST_ID, comment)
+                    comment.post_data.update(comment.new_post_data)
+                    multicall.wp.newComment('', username, password,
+                                            self.BLOG_POST_ID,
+                                            comment.post_data)
                     multicall_log.append('new')
                 elif comment.get_server_var__Status() == 'rm':
                     multicall.wp.deleteComment('', username, password,
                                                comment.get_server_var__ID())
                 else:
                     comment_id = comment.get_server_var__ID()
-                    multicall.wp.editComment(
-                            '', username, password, comment_id, comment)
+                    multicall.wp.editComment('', username, password,
+                                             comment_id, comment.post_data)
                     multicall_log.append(comment_id)
             for accepted, comment_id in zip(multicall(), multicall_log):
                 if comment_id != 'new' and not accepted:

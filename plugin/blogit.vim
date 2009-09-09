@@ -638,7 +638,7 @@ class BlogIt(object):
 
         def init_vim_buffer(self):
             super(BlogIt.BlogPost, self).init_vim_buffer()
-            vim.command('nnoremap <buffer> gf :Blogit list_comments<cr>')
+            vim.command('nnoremap <buffer> gf :Blogit! list_comments<cr>')
             vim.command('setlocal ft=mail textwidth=0 ' +
                                  'completefunc=BlogItComplete')
             vim.current.window.cursor = (8, 0)

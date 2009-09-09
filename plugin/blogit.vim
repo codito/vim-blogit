@@ -22,7 +22,7 @@
 
 
 runtime! passwords.vim
-command! -bang -nargs=* Blogit exec('py blogit.command(<f-args>, bang="<bang>")')
+command! -bang -nargs=* Blogit exec('py blogit.command("<bang>", <f-args>)')
 
 let s:used_categories = []
 let s:used_tags = []
@@ -1376,28 +1376,29 @@ class BlogIt(object):
 
     vimcommand_help = []
 
-    def command(self, command='help', *args, **dic):
-        """
+    def command(self, bang='', command='help', *args):
+        """ Interface called by vim user-function ':Blogit'.
+
         >>> mock('xmlrpclib')
         >>> mock('sys.stderr')
-        >>> blogit.command('non-existant')
+        >>> blogit.command('', 'non-existant')
         Called sys.stderr.write('No such command: non-existant.')
 
         >>> def f(x): print 'got %s' % x
         >>> blogit.command_mocktest = f
-        >>> blogit.command('mo')
+        >>> blogit.command('', 'mo')
         Called sys.stderr.write('Command mo takes 0 arguments.')
 
-        >>> blogit.command('mo', 2)
+        >>> blogit.command('', 'mo', 2)
         got 2
 
         >>> blogit.command_mockambiguous = f
-        >>> blogit.command('mo')    #doctest: +NORMALIZE_WHITESPACE
+        >>> blogit.command('', 'mo')    #doctest: +NORMALIZE_WHITESPACE
         Called sys.stderr.write('Ambiguious command mo:
                 mockambiguous, mocktest.')
 
         >>> mock('blogit.list_edit')
-        >>> blogit.command('list_edit', bang='!')
+        >>> blogit.command('!', 'list_edit')
         Called blogit.list_edit()
 
         >>> minimock.restore()
@@ -1405,14 +1406,11 @@ class BlogIt(object):
         def f(x): return x.startswith('command_' + command)
         matching_commands = filter(f, dir(self))
 
-        try:
-            if dic['bang'] == '!':
-                # Workaround limit to access vim s:variables when
-                # called via :python.
-                getattr(self, command)()
-                return
-        except KeyError:
-            pass
+        if bang == '!':
+            # Workaround limit to access vim s:variables when
+            # called via :python.
+            getattr(self, command)()
+            return
         if len(matching_commands) == 0:
             sys.stderr.write("No such command: %s." % command)
         elif len(matching_commands) == 1:

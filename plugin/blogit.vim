@@ -1403,14 +1403,15 @@ class BlogIt(object):
 
         >>> minimock.restore()
         """
-        def f(x): return x.startswith('command_' + command)
-        matching_commands = filter(f, dir(self))
-
         if bang == '!':
             # Workaround limit to access vim s:variables when
             # called via :python.
             getattr(self, command)()
             return
+
+        def f(x): return x.startswith('command_' + command)
+        matching_commands = filter(f, dir(self))
+
         if len(matching_commands) == 0:
             sys.stderr.write("No such command: %s." % command)
         elif len(matching_commands) == 1:

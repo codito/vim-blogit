@@ -1656,7 +1656,7 @@ class BlogIt(object):
     def command_unpush(self):
         """ unpublish post """
         p = self.current_post
-        p.send(vim.current.buffer[:], push=1)
+        p.send(vim.current.buffer[:], push=0)
         p.refresh_vim_buffer()
 
     @vimcommand

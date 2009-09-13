@@ -966,7 +966,8 @@ class BlogIt(object):
                                   'Categories_AS_list': 'categories',
                                   'Date_AS_DateTime': 'dateCreated',
                                   'Status_AS_dict': 'blogit_status',
-                                  'Page': 'wp_slug'
+                                  'Page': 'wp_slug',
+                                  'Status_post': 'page_status',
                                  }
             super(BlogIt.WordPressPage, self
                  ).__init__(blog_post_id, post_data, meta_data_dict,
@@ -975,8 +976,12 @@ class BlogIt(object):
                 client = xmlrpclib.ServerProxy(self.vim_vars.blog_url)
             self.client = client
 
-        def send(self, lines):
+        def send(self, lines, push=None):
             self.read_post(lines)
+            if push == 1:
+                self.set_server_var__Status_post('publish')
+            elif push == 0:
+                self.set_server_var__Status_post('draft')
             self.post_data.update(self.new_post_data)
             self.client.wp.editPage('', self.BLOG_POST_ID,
                                     self.vim_vars.blog_username,

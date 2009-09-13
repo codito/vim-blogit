@@ -934,9 +934,12 @@ class BlogIt(object):
             >>> BlogIt.Page(42).read_header__Id('42 (about)')
             Called BlogIt.BlogPost.set_server_var_default('Page', 'about')
             Called BlogIt.BlogPost.set_server_var_default('Id', '42')
+            >>> BlogIt.Page(42).read_header__Id(' (about)')
+            Called BlogIt.BlogPost.set_server_var_default('Page', 'about')
+            Called BlogIt.BlogPost.set_server_var_default('Id', '')
             >>> minimock.restore()
             """
-            id, page = re.match('(\d+) *\((.*)\)', text).group(1, 2)
+            id, page = re.match('(\d*) *\((.*)\)', text).group(1, 2)
             self.set_server_var__Page(page)
             #super(BlogIt.Page, self).read_header__Id(id)
             BlogIt.BlogPost.read_header_default(self, 'Id', id)
@@ -983,10 +986,16 @@ class BlogIt(object):
             elif push == 0:
                 self.set_server_var__Status_post('draft')
             self.post_data.update(self.new_post_data)
-            self.client.wp.editPage('', self.BLOG_POST_ID,
-                                    self.vim_vars.blog_username,
-                                    self.vim_vars.blog_password,
-                                    self.post_data)
+            if self.BLOG_POST_ID == '':
+                self.BLOG_POST_ID = self.client.wp.newPage('',
+                                                 self.vim_vars.blog_username,
+                                                 self.vim_vars.blog_password,
+                                                 self.post_data)
+            else:
+                self.client.wp.editPage('', self.BLOG_POST_ID,
+                                        self.vim_vars.blog_username,
+                                        self.vim_vars.blog_password,
+                                        self.post_data)
             self.getPost()
 
         def getPost(self):

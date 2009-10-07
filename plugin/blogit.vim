@@ -100,6 +100,7 @@ except ImportError:
 else:
     doctest = None
 
+warnings.simplefilter('ignore', Warning)
 warnings.simplefilter('always', UnicodeWarning)
 
 #####################
@@ -107,6 +108,18 @@ warnings.simplefilter('always', UnicodeWarning)
 #####################
 
 class BlogIt(object):
+    @staticmethod
+    def enc(text):
+        """ Helper function to encode ascii or unicode strings.
+
+        Used when communicating with Vim buffers and commands.
+        """
+        try:
+            return text.encode('utf-8')
+        except UnicodeDecodeError:
+            return text
+
+
     class BlogItException(Exception):
         pass
 
@@ -213,12 +226,8 @@ class BlogIt(object):
 
     class AbstractBufferIO(object):
         def refresh_vim_buffer(self):
-            def enc(text):
-                try:
-                    return text.encode('utf-8')
-                except UnicodeDecodeError:
-                    return text
-            vim.current.buffer[:] = [ enc(line) for line in self.display() ]
+            vim.current.buffer[:] = [ BlogIt.enc(line)
+                                            for line in self.display() ]
             vim.command('setlocal nomodified')
 
         def init_vim_buffer(self):
@@ -883,10 +892,11 @@ class BlogIt(object):
                 multicall.wp.getCategories('', username, password)
                 multicall.wp.getTags('', username, password)
                 d, comments, categories, tags = tuple(multicall())
-                vim.command('let s:used_tags = %s' % [ tag['name']
-                        for tag in tags ])
-                vim.command('let s:used_categories = %s' % [ cat['categoryName']
-                        for cat in categories ])
+                vim.command('let s:used_tags = %s' %
+                                [ BlogIt.enc(tag['name']) for tag in tags ])
+                vim.command('let s:used_categories = %s' %
+                                [ BlogIt.enc(cat['categoryName'])
+                                                       for cat in categories ])
             else:
                 d, comments = tuple(multicall())
             comments['post_status'] = d['post_status']

@@ -100,7 +100,7 @@ except ImportError:
 else:
     doctest = None
 
-warnings.simplefilter('ignore', Warning)
+#warnings.simplefilter('ignore', Warning)
 warnings.simplefilter('always', UnicodeWarning)
 
 #####################

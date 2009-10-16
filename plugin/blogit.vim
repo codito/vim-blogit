@@ -110,9 +110,18 @@ warnings.simplefilter('always', UnicodeWarning)
 class BlogIt(object):
     @staticmethod
     def enc(text):
-        """ Helper function to encode ascii or unicode strings.
+        r""" Helper function to encode ascii or unicode strings.
 
         Used when communicating with Vim buffers and commands.
+
+        >>> BlogIt.enc(u'bla')
+        'bla'
+        >>> BlogIt.enc('bla')
+        'bla'
+        >>> type(BlogIt.enc(u'\xc3'))
+        <type 'str'>
+        >>> BlogIt.enc(u'\xc3')
+        '\xc3\x83'
         """
         try:
             return text.encode('utf-8')

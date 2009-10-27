@@ -388,6 +388,13 @@ class BlogIt(object):
             id = self.post_data[n]['page_id']
             return BlogIt.WordPressPage(id, vim_vars=self.vim_vars)
 
+    class PostModel(object):
+        def __init__(self, post_data, meta_data_dict, headers, post_body):
+            self.post_data = post_data
+            self.meta_data_dict = meta_data_dict
+            self.headers = headers
+            self.post_body = post_body
+
 
     class AbstractPost(AbstractBufferIO):
         class BlogItServerVarUndefined(Exception):
@@ -1727,8 +1734,8 @@ class BlogIt(object):
         multicall.wp.getCategories('', username, password)
         multicall.wp.getTags('', username, password)
         categories, tags = tuple(multicall())
-        tags = [ tag['name'] for tag in tags ]
-        categories = [ cat['categoryName'] for cat in categories ]
+        tags = [ BlogIt.enc(tag['name']) for tag in tags ]
+        categories = [ BlogIt.enc(cat['categoryName']) for cat in categories ]
         vim.command('let s:used_tags = %s' % tags)
         vim.command('let s:used_categories = %s' % categories)
         sys.stdout.write('\n \n \nCategories\n==========\n \n' + ', '.join(categories))

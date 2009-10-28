@@ -129,6 +129,31 @@ class BlogIt(object):
             return text
 
 
+    @staticmethod
+    def to_vim_list(L):
+        r""" Helper function to encode a List for ":let L = [ 'a', 'b' ]"
+
+        >>> BlogIt.to_vim_list([])
+        '[  ]'
+        >>> BlogIt.to_vim_list(['a'])
+        '[ "a" ]'
+        >>> BlogIt.to_vim_list(['a', 'b'])
+        '[ "a", "b" ]'
+        >>> BlogIt.to_vim_list(['a', 'b', 'c'])
+        '[ "a", "b", "c" ]'
+        >>> BlogIt.to_vim_list([r'\n']) == r'[ "\\n" ]'
+        True
+        >>> BlogIt.to_vim_list(['a"b']) == r'[ "a\"b" ]'
+        True
+        >>> BlogIt.to_vim_list(['B\xc3ume']) == '[ "B\xc3ume" ]'
+        True
+        """
+        L = [ '"%s"' % BlogIt.enc(item).replace('\\', '\\\\'
+                                               ).replace('"', r'\"')
+                    for item in L ]
+        return '[ %s ]' % ', '.join(L)
+
+
     class BlogItException(Exception):
         pass
 
@@ -908,11 +933,10 @@ class BlogIt(object):
                 multicall.wp.getCategories('', username, password)
                 multicall.wp.getTags('', username, password)
                 d, comments, categories, tags = tuple(multicall())
-                vim.command('let s:used_tags = %s' %
-                                [ BlogIt.enc(tag['name']) for tag in tags ])
-                vim.command('let s:used_categories = %s' %
-                                [ BlogIt.enc(cat['categoryName'])
-                                                       for cat in categories ])
+                vim.command('let s:used_tags = %s' % BlogIt.to_vim_list(
+                        [ tag['name'] for tag in tags ]))
+                vim.command('let s:used_categories = %s' % BlogIt.to_vim_list(
+                        [ cat['categoryName'] for cat in categories ]))
             else:
                 d, comments = tuple(multicall())
             comments['post_status'] = d['post_status']
@@ -1736,9 +1760,11 @@ class BlogIt(object):
         categories, tags = tuple(multicall())
         tags = [ BlogIt.enc(tag['name']) for tag in tags ]
         categories = [ BlogIt.enc(cat['categoryName']) for cat in categories ]
-        vim.command('let s:used_tags = %s' % tags)
-        vim.command('let s:used_categories = %s' % categories)
-        sys.stdout.write('\n \n \nCategories\n==========\n \n' + ', '.join(categories))
+        vim.command('let s:used_tags = %s' % BlogIt.to_vim_list(tags))
+        vim.command('let s:used_categories = %s' %
+                            BlogIt.to_vim_list(categories))
+        sys.stdout.write('\n \n \nCategories\n==========\n \n' +
+                         ', '.join(categories))
         sys.stdout.write('\n \n \nTags\n====\n \n' + ', '.join(tags))
 
     @vimcommand

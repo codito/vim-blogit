@@ -17,8 +17,8 @@
 " Maintainer:   Romain Bignon
 " Contributor:  Adam Schmalhofer
 " URL:          http://symlink.me/wiki/blogit
-" Version:      1.4
-" Last Change:  2009 September 10
+" Version:      1.4.2
+" Last Change:  2009 October 28
 
 
 runtime! passwords.vim

@@ -968,7 +968,7 @@ class BlogIt(object):
             >>> mock('vim.mocked_eval', tracker=None)
             >>> BlogIt.WordPressBlogPost.create_new_post(BlogIt.VimVars()
             ... )     #doctest: +ELLIPSIS
-            <__main__.WordPressBlogPost object at 0x...>
+            <testing.blogit.WordPressBlogPost object at 0x...>
             >>> minimock.restore()
             """
             b = cls('', post_data={'post_status': 'draft', 'description': '',
@@ -1091,7 +1091,7 @@ class BlogIt(object):
             >>> mock('vim.mocked_eval', tracker=None)
             >>> BlogIt.WordPressPage.create_new_post(BlogIt.VimVars()
             ... )     #doctest: +ELLIPSIS
-            <__main__.WordPressPage object at 0x...>
+            <testing.blogit.WordPressPage object at 0x...>
             >>> minimock.restore()
             """
             b = cls('', post_data={'page_status': 'draft', 'description': '',
@@ -1453,7 +1453,7 @@ class BlogIt(object):
         >>> blogit.current_post = Mock('post@buffer_3_', tracker=None)
         >>> vim.current.buffer.change_buffer(7)
         >>> blogit.current_post    #doctest: +ELLIPSIS
-        <__main__.NoPost object at 0x...>
+        <testing.blogit.NoPost object at 0x...>
         >>> blogit.current_post = Mock('post@buffer_7_', tracker=None)
         >>> vim.current.buffer.change_buffer(3)
         >>> blogit.current_post    #doctest: +ELLIPSIS

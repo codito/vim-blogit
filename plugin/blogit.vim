@@ -55,13 +55,13 @@ function! BlogItComplete(findstart, base)
         else
             return []
         endif
-	    let res = []
-	    for m in L
-	        if m =~ '^' . a:base
-		        call add(res, m . sep)
-	        endif
-	    endfor
-	    return res
+        let res = []
+        for m in L
+            if m =~ '^' . a:base
+                call add(res, m . sep)
+            endif
+        endfor
+        return res
     endif
 endfunction
 
@@ -80,14 +80,17 @@ endfunction
 
 python <<EOF
 # Lets the python unit test ignore everything above this line (docstring). """
-import xmlrpclib, sys, re
+import xmlrpclib
+import sys
+import re
 from time import mktime, strptime, strftime, localtime, gmtime
 from locale import getpreferredencoding
 from calendar import timegm
 from subprocess import Popen, CalledProcessError, PIPE
 from xmlrpclib import DateTime, Fault, MultiCall
 from inspect import getargspec
-import webbrowser, tempfile
+import webbrowser
+import tempfile
 import warnings
 
 try:
@@ -95,7 +98,8 @@ try:
 except ImportError:
     # Used outside of vim (for testing)
     from minimock import Mock, mock
-    import minimock, doctest
+    import minimock
+    import doctest
     from mock_vim import vim
 else:
     doctest = None
@@ -103,11 +107,9 @@ else:
 #warnings.simplefilter('ignore', Warning)
 warnings.simplefilter('always', UnicodeWarning)
 
-#####################
-# Do not edit below #
-#####################
 
 class BlogIt(object):
+
     @staticmethod
     def enc(text):
         r""" Helper function to encode ascii or unicode strings.
@@ -148,9 +150,8 @@ class BlogIt(object):
         >>> BlogIt.to_vim_list(['B\xc3ume']) == '[ "B\xc3ume" ]'
         True
         """
-        L = [ '"%s"' % BlogIt.enc(item).replace('\\', '\\\\'
-                                               ).replace('"', r'\"')
-                    for item in L ]
+        L = ['"%s"' % BlogIt.enc(item).replace('\\', '\\\\')
+             .replace('"', r'\"') for item in L]
         return '[ %s ]' % ', '.join(L)
 
 
@@ -171,6 +172,7 @@ class BlogIt(object):
 
 
     class FilterException(BlogItException):
+
         def __init__(self, message, input_text, filter):
             self.message = "Blogit: Error happend while filtering with:" + \
                     filter + '\n' + message
@@ -179,6 +181,7 @@ class BlogIt(object):
 
 
     class VimVars(object):
+
         def __init__(self, blog_name=None):
             if blog_name is None:
                 blog_name = self.vim_blog_name
@@ -221,7 +224,7 @@ class BlogIt(object):
 
         @property
         def vim_blog_name(self):
-            for var_name in ( 'b:blog_name', 'blog_name' ):
+            for var_name in ('b:blog_name', 'blog_name'):
                 var_value = self.vim_variable(var_name, prefix=False)
                 if var_value is not None:
                     return var_value
@@ -230,7 +233,7 @@ class BlogIt(object):
         def vim_variable(self, var_name, prefix=True):
             """ Simplefy access to vim-variables. """
             if prefix:
-                var_name = '_'.join(( self.blog_name, var_name ))
+                var_name = '_'.join((self.blog_name, var_name))
             if vim.eval("exists('%s')" % var_name) == '1':
                 return vim.eval('%s' % var_name)
             else:
@@ -259,9 +262,10 @@ class BlogIt(object):
 
 
     class AbstractBufferIO(object):
+
         def refresh_vim_buffer(self):
-            vim.current.buffer[:] = [ BlogIt.enc(line)
-                                            for line in self.display() ]
+            vim.current.buffer[:] = [BlogIt.enc(line)
+                                            for line in self.display()]
             vim.command('setlocal nomodified')
 
         def init_vim_buffer(self):
@@ -284,9 +288,9 @@ class BlogIt(object):
             self.client = client
             self.post_data = None
             if row_types is None:
-                row_types = ( BlogIt.MetaWeblogPostListingPosts,
-                              BlogIt.WordPressPostListingPages )
-            self.row_groups = [ group(vim_vars) for group in row_types ]
+                row_types = (BlogIt.MetaWeblogPostListingPosts,
+                             BlogIt.WordPressPostListingPages)
+            self.row_groups = [group(vim_vars) for group in row_types]
 
         @classmethod
         def create_new_post(cls, vim_vars, body_lines=['']):
@@ -334,16 +338,16 @@ class BlogIt(object):
                     break
             else:
                 raise BlogIt.PostListingEmptyException
-            id_column_width = max(2, *[ p.min_id_column_width
-                                            for p in self.row_groups ])
-            yield "%sID    Date%sTitle" % ( ' ' * ( id_column_width - 2 ),
-                    ' ' * len(BlogIt.DateTime_to_str(DateTime(), '%x')) )
+            id_column_width = max(2, *[p.min_id_column_width
+                                            for p in self.row_groups])
+            yield "%sID    Date%sTitle" % (' ' * (id_column_width - 2),
+                    ' ' * len(BlogIt.DateTime_to_str(DateTime(), '%x')))
             format = '%%%dd    %%s    %%s' % id_column_width
             for row_group in self.row_groups:
                 for post_id, date, title in row_group.rows_data():
-                    yield format % ( int(post_id),
-                                     BlogIt.DateTime_to_str(date, '%x'),
-                                     title )
+                    yield format % (int(post_id),
+                                    BlogIt.DateTime_to_str(date, '%x'),
+                                    title)
 
         def getPost(self):
             multicall = xmlrpclib.MultiCall(self.client)
@@ -362,6 +366,7 @@ class BlogIt(object):
 
 
     class AbstractPostListingSource(object):
+
         def __init__(self, id_date_title_tags, vim_vars):
             self.id_date_title_tags = id_date_title_tags
             self.vim_vars = vim_vars
@@ -377,19 +382,21 @@ class BlogIt(object):
         @property
         def min_id_column_width(self):
             return max(-1, -1,    # Work-around max(-1, *[]) not-iterable.
-                       *[ len(str(p[self.id_date_title_tags[0]]))
-                                for p in self.post_data ])
+                       *[len(str(p[self.id_date_title_tags[0]]))
+                                                for p in self.post_data])
 
         def rows_data(self):
             post_id, date, title = self.id_date_title_tags
             for p in self.post_data:
-                yield ( p[post_id], p[date], p[title] )
+                yield (p[post_id], p[date], p[title])
 
 
     class MetaWeblogPostListingPosts(AbstractPostListingSource):
+
         def __init__(self, vim_vars):
-            super(BlogIt.MetaWeblogPostListingPosts, self).__init__(
-                ( 'postid', 'date_created_gmt', 'title' ), vim_vars )
+            super(BlogIt.MetaWeblogPostListingPosts,
+                  self).__init__(('postid', 'date_created_gmt', 'title'),
+                                 vim_vars)
 
         def xmlrpc_call__getPost(self, multicall):
             multicall.metaWeblog.getRecentPosts('',
@@ -401,9 +408,11 @@ class BlogIt(object):
 
 
     class WordPressPostListingPages(AbstractPostListingSource):
+
         def __init__(self, vim_vars):
-            super(BlogIt.WordPressPostListingPages, self).__init__(
-                ( 'page_id', 'dateCreated', 'page_title' ), vim_vars )
+            super(BlogIt.WordPressPostListingPages,
+                  self).__init__(('page_id', 'dateCreated', 'page_title'),
+                                 vim_vars)
 
         def xmlrpc_call__getPost(self, multicall):
             multicall.wp.getPageList('',
@@ -414,6 +423,7 @@ class BlogIt(object):
             return BlogIt.WordPressPage(id, vim_vars=self.vim_vars)
 
     class PostModel(object):
+
         def __init__(self, post_data, meta_data_dict, headers, post_body):
             self.post_data = post_data
             self.meta_data_dict = meta_data_dict
@@ -422,10 +432,12 @@ class BlogIt(object):
 
 
     class AbstractPost(AbstractBufferIO):
+
         class BlogItServerVarUndefined(Exception):
+
             def __init__(self, label):
-                super(BlogIt.AbstractPost.BlogItServerVarUndefined, self
-                     ).__init__('Unknown: %s.' % label)
+                super(BlogIt.AbstractPost.BlogItServerVarUndefined,
+                      self).__init__('Unknown: %s.' % label)
                 self.label = label
 
         def __init__(self, post_data={}, meta_data_dict={}, headers=[],
@@ -436,7 +448,7 @@ class BlogIt(object):
             """
             self.post_data = post_data
             self.new_post_data = {}
-            self.meta_data_dict = { 'Body': post_body }
+            self.meta_data_dict = {'Body': post_body}
             for h in headers:
                 self.meta_data_dict[h] = h
             self.meta_data_dict.update(meta_data_dict)
@@ -458,6 +470,7 @@ class BlogIt(object):
             True
             >>> minimock.restore()
             """
+
             def base_name():
                 start = name.find('__') + 2
                 return name[start:]
@@ -505,7 +518,7 @@ class BlogIt(object):
             self.set_server_var__Body('')
             for i, line in enumerate(lines):
                 if line.strip() == '':
-                    self.read_body(lines[i+1:])
+                    self.read_body(lines[i + 1:])
                     break
                 self.read_header(line)
             return self.new_post_data
@@ -543,7 +556,7 @@ class BlogIt(object):
             '<foo>'
             """
             text = getattr(self, 'display_header__' + label)()
-            return '%s: %s' % ( label, unicode(text).encode('utf-8') )
+            return '%s: %s' % (label, unicode(text).encode('utf-8'))
 
         def display_header_default(self, label):
             return getattr(self, 'get_server_var__' + label)()
@@ -589,8 +602,8 @@ class BlogIt(object):
             'Tags: <Tags>'
             """
             try:
-                val = getattr(self, 'get_server_var__%s_AS_%s' % (
-                        label, from_type ))()
+                val = getattr(self, 'get_server_var__%s_AS_%s' %
+                                    (label, from_type))()
             except self.BlogItServerVarUndefined:
                 return self.get_server_var_default(label)
             else:
@@ -611,8 +624,8 @@ class BlogIt(object):
             """
             val = getattr(self, 'server_var_to__' + from_type)(str_val)
             try:
-                getattr(self, 'set_server_var__%s_AS_%s' % (
-                        label, from_type ))(val)
+                getattr(self, 'set_server_var__%s_AS_%s' % (label,
+                                                            from_type))(val)
             except self.BlogItServerVarUndefined:
                 self.set_server_var_default(label, str_val)
 
@@ -644,7 +657,7 @@ class BlogIt(object):
             return BlogIt.DateTime_to_str(val)
 
         def server_var_to__list(self, str_val):
-            return [ s.strip() for s in str_val.split(',') ]
+            return [s.strip() for s in str_val.split(',')]
 
         def server_var_from__list(self, val):
             return ', '.join(val)
@@ -663,7 +676,7 @@ class BlogIt(object):
                      headers=None, post_body='description', vim_vars=None):
             if headers is None:
                 headers = ['From', 'Id', 'Subject', 'Status',
-                           'Categories', 'Tags', 'Date' ]
+                           'Categories', 'Tags', 'Date']
             if vim_vars is None:
                 vim_vars = BlogIt.VimVars()
             super(BlogIt.BlogPost, self).__init__(post_data, meta_data_dict,
@@ -675,16 +688,16 @@ class BlogIt(object):
             d = self.get_server_var__Status_AS_dict()
             if d == '':
                 return u'new'
-            comment_typ_count = [ '%s %s' % (d[key], text)
-                    for key, text in ( ( 'awaiting_moderation', 'awaiting' ),
-                            ( 'spam', 'spam' ) )
-                    if d[key] > 0 ]
+            comment_typ_count = ['%s %s' % (d[key], text)
+                    for key, text in (('awaiting_moderation', 'awaiting'),
+                                      ('spam', 'spam'))
+                    if d[key] > 0]
             if comment_typ_count == []:
                 s = u''
             else:
                 s = u' (%s)' % ', '.join(comment_typ_count)
-            return ( u'%(post_status)s \u2013 %(total_comments)s Comments'
-                    + s ) % d
+            return (u'%(post_status)s \u2013 %(total_comments)s Comments'
+                    + s) % d
 
         def init_vim_buffer(self):
             super(BlogIt.BlogPost, self).init_vim_buffer()
@@ -726,8 +739,8 @@ class BlogIt(object):
             >>> minimock.restore()
             """
             if text.lstrip().startswith('<!--blogit-- '):
-                return ( text.replace('<!--blogit--', '', 1).
-                        split(' --blogit-->', 1)[0].strip() )
+                return (text.replace('<!--blogit--', '',
+                                     1).split(' --blogit-->', 1)[0].strip())
             try:
                 return self.filter(text, 'unformat')
             except BlogIt.FilterException, e:
@@ -763,7 +776,8 @@ class BlogIt(object):
             """
             formated = self.filter(text, 'format')
             if self.vim_vars.blog_postsource:
-                formated = "<!--blogit--\n%s\n--blogit-->\n%s" % ( text, formated )
+                formated = "<!--blogit--\n%s\n--blogit-->\n%s" % (text,
+                                                                  formated)
             return formated
 
         def filter(self, text, vim_var='format'):
@@ -808,17 +822,18 @@ class BlogIt(object):
             if filter is None:
                 return text
             try:
-                p = Popen(filter, shell=True, stdin=PIPE, stdout=PIPE, stderr=PIPE)
+                p = Popen(filter, shell=True, stdin=PIPE, stdout=PIPE,
+                          stderr=PIPE)
                 try:
                     p.stdin.write(text.encode(getpreferredencoding()))
                 except UnicodeDecodeError:
-                    p.stdin.write(text.decode('utf-8'
-                                             ).encode(getpreferredencoding()))
+                    p.stdin.write(text.decode('utf-8')\
+                                      .encode(getpreferredencoding()))
                 p.stdin.close()
                 if p.wait():
                     raise BlogIt.FilterException(p.stderr.read(), text, filter)
-                return p.stdout.read().decode(getpreferredencoding()
-                                             ).encode('utf-8')
+                return p.stdout.read().decode(getpreferredencoding())\
+                                      .encode('utf-8')
             except BlogIt.FilterException:
                 raise
             except Exception, e:
@@ -842,6 +857,7 @@ class BlogIt(object):
 
 
     class WordPressBlogPost(BlogPost):
+
         def __init__(self, blog_post_id, post_data={}, meta_data_dict=None,
                      headers=None, post_body='description', vim_vars=None,
                      client=None):
@@ -854,9 +870,9 @@ class BlogIt(object):
                                   'Date_AS_DateTime': 'date_created_gmt',
                                   'Status_AS_dict': 'blogit_status',
                                  }
-            super(BlogIt.WordPressBlogPost, self
-                 ).__init__(blog_post_id, post_data, meta_data_dict,
-                            headers, post_body, vim_vars)
+            super(BlogIt.WordPressBlogPost,
+                  self).__init__(blog_post_id, post_data, meta_data_dict,
+                                 headers, post_body, vim_vars)
             if client is None:
                 client = xmlrpclib.ServerProxy(self.vim_vars.blog_url)
             self.client = client
@@ -892,8 +908,8 @@ class BlogIt(object):
             if push == 1 or push == 0:
                 self.set_server_var__Date_AS_DateTime(DateTime())
             self.post_data.update(self.new_post_data)
-            push_dict = { 0: 'draft', 1: 'publish',
-                          None: self.post_data['post_status'] }
+            push_dict = {0: 'draft', 1: 'publish',
+                         None: self.post_data['post_status']}
             self.post_data['post_status'] = push_dict[push]
             if push is None:
                 push = 0
@@ -910,11 +926,12 @@ class BlogIt(object):
             >>> mock('vim.mocked_eval')
 
             >>> p = BlogIt.WordPressBlogPost(42)
-            >>> p.getPost()
+            >>> p.getPost()    #doctest: +NORMALIZE_WHITESPACE
             Called xmlrpclib.MultiCall(<ServerProxy for example.com/RPC2>)
             Called multicall.metaWeblog.getPost(42, 'user', 'password')
             Called multicall.wp.getCommentCount('', 'user', 'password', 42)
-            Called vim.mocked_eval('s:used_tags == [] || s:used_categories == []')
+            Called vim.mocked_eval('s:used_tags == [] ||
+                                    s:used_categories == []')
             Called multicall()
             >>> sorted(p.post_data.items())    #doctest: +NORMALIZE_WHITESPACE
             [('blogit_status', {'post_status': 'draft'}),
@@ -934,9 +951,10 @@ class BlogIt(object):
                 multicall.wp.getTags('', username, password)
                 d, comments, categories, tags = tuple(multicall())
                 vim.command('let s:used_tags = %s' % BlogIt.to_vim_list(
-                        [ tag['name'] for tag in tags ]))
-                vim.command('let s:used_categories = %s' % BlogIt.to_vim_list(
-                        [ cat['categoryName'] for cat in categories ]))
+                        [tag['name'] for tag in tags]))
+                vim.command('let s:used_categories = %s' %
+                            BlogIt.to_vim_list([cat['categoryName']
+                                                    for cat in categories]))
             else:
                 d, comments = tuple(multicall())
             comments['post_status'] = d['post_status']
@@ -975,7 +993,7 @@ class BlogIt(object):
                      client=None):
             if headers is None:
                 headers = ['From', 'Id', 'Subject', 'Status', 'Categories',
-                           'Date' ]
+                           'Date']
             super(BlogIt.Page, self).__init__(blog_post_id, post_data,
                                               meta_data_dict, headers,
                                               post_body, vim_vars)
@@ -1005,12 +1023,13 @@ class BlogIt(object):
             >>> minimock.restore()
             """
             #super(BlogIt.Page, self).display_header__Id()
-            return '%s (%s)' % ( BlogIt.BlogPost.display_header_default(self,
-                                                                        'Id'),
-                                 self.get_server_var__Page() )
+            return '%s (%s)' % (BlogIt.BlogPost.display_header_default(self,
+                                                                       'Id'),
+                                self.get_server_var__Page())
 
 
     class WordPressPage(Page):
+
         def __init__(self, blog_post_id, post_data={}, meta_data_dict=None,
                      headers=None, post_body='description', vim_vars=None,
                      client=None):
@@ -1024,9 +1043,9 @@ class BlogIt(object):
                                   'Page': 'wp_slug',
                                   'Status_post': 'page_status',
                                  }
-            super(BlogIt.WordPressPage, self
-                 ).__init__(blog_post_id, post_data, meta_data_dict,
-                            headers, post_body, vim_vars)
+            super(BlogIt.WordPressPage,
+                  self).__init__(blog_post_id, post_data, meta_data_dict,
+                                 headers, post_body, vim_vars)
             if client is None:
                 client = xmlrpclib.ServerProxy(self.vim_vars.blog_url)
             self.client = client
@@ -1081,7 +1100,7 @@ class BlogIt(object):
                     'categories': [], 'dateCreated': '',
                     'Status_AS_dict': {'awaiting_moderation': 0, 'spam': 0,
                                        'post_status': 'draft',
-                                       'total_comments': 0 }},
+                                       'total_comments': 0}},
                     vim_vars=vim_vars)
             b.init_vim_buffer()
             if body_lines != ['']:
@@ -1090,6 +1109,7 @@ class BlogIt(object):
 
 
     class Comment(AbstractPost):
+
         def __init__(self, post_data={}, meta_data_dict={}, headers=None,
                      post_body='content'):
             if headers is None:
@@ -1109,8 +1129,8 @@ class BlogIt(object):
         @classmethod
         def create_emtpy_comment(cls, *a, **d):
             c = cls(*a, **d)
-            c.read_post([ 'Status: new', 'Author: ', 'ID: ', 'Parent: 0',
-                          'Date: ', 'Type: ', '', ''])
+            c.read_post(['Status: new', 'Author: ', 'ID: ', 'Parent: 0',
+                         'Date: ', 'Type: ', '', ''])
             c.post_data = c.new_post_data
             return c
 
@@ -1123,8 +1143,8 @@ class BlogIt(object):
             super(BlogIt.CommentList, self).__init__({}, meta_data_dict,
                      headers, post_body)
             if comment_categories is None:
-                comment_categories = ( 'New', 'In Moderadation', 'Spam',
-                                       'Published' )
+                comment_categories = ('New', 'In Moderadation', 'Spam',
+                                      'Published')
             self.comment_categories = comment_categories
             self.empty_comment_list()
 
@@ -1137,9 +1157,9 @@ class BlogIt(object):
         def empty_comment_list(self):
             self.comment_list = {}
             self.comments_by_category = {}
-            self.add_comment('New', BlogIt.Comment.create_emtpy_comment(
-                    {}, self.meta_data_dict, self.HEADERS, self.POST_BODY
-            ).post_data)
+            empty_comment = BlogIt.Comment.create_emtpy_comment({},
+                             self.meta_data_dict, self.HEADERS, self.POST_BODY)
+            self.add_comment('New', empty_comment.post_data)
 
         def add_comment(self, category, comment_dict):
             """ Callee must garanty that no comment with same id is in list.
@@ -1171,12 +1191,13 @@ class BlogIt(object):
             try:
                 self.comments_by_category[category].append(comment)
             except KeyError:
-                self.comments_by_category[category] = [ comment ]
+                self.comments_by_category[category] = [comment]
 
         def display(self):
             """
 
-            >>> list(BlogIt.CommentList().display())    #doctest: +NORMALIZE_WHITESPACE
+            >>> list(BlogIt.CommentList().display())
+            ...     #doctest: +NORMALIZE_WHITESPACE
             ['======================================================================== {{{1',
              '     New',
              '======================================================================== {{{2',
@@ -1249,7 +1270,7 @@ class BlogIt(object):
             lines = list(lines)
             for i, line in enumerate(lines):
                 if line.startswith(60 * '='):
-                    if i-j > 1:
+                    if i - j > 1:
                         yield self._read_post__read_comment(lines[j:i])
                     j = i + 1
             yield self._read_post__read_comment(lines[j:])
@@ -1296,15 +1317,16 @@ class BlogIt(object):
 
 
     class WordPressCommentList(CommentList):
+
         def __init__(self, blog_post_id, meta_data_dict=None, headers=None,
                      post_body='content', vim_vars=None, client=None,
                      comment_categories=None):
             if meta_data_dict is None:
-                meta_data_dict = { 'Status': 'status', 'Author': 'author',
-                        'ID': 'comment_id', 'Parent': 'parent',
-                        'Date_AS_DateTime': 'date_created_gmt', 'Type': 'type',
-                        'content': 'content',
-                        }
+                meta_data_dict = {'Status': 'status', 'Author': 'author',
+                                  'ID': 'comment_id', 'Parent': 'parent',
+                                  'Date_AS_DateTime': 'date_created_gmt',
+                                  'Type': 'type', 'content': 'content',
+                                 }
             super(BlogIt.WordPressCommentList, self).__init__(
                     meta_data_dict, headers, post_body, comment_categories)
             if vim_vars is None:
@@ -1349,7 +1371,8 @@ class BlogIt(object):
 
             """
             multicall = xmlrpclib.MultiCall(self.client)
-            username, password = self.vim_vars.blog_username, self.vim_vars.blog_password
+            username, password = (self.vim_vars.blog_username,
+                                  self.vim_vars.blog_password)
             multicall_log = []
             for comment in self.changed_comments(lines):
                 if comment.get_server_var__Status() == 'new':
@@ -1369,7 +1392,8 @@ class BlogIt(object):
                     multicall_log.append(comment_id)
             for accepted, comment_id in zip(multicall(), multicall_log):
                 if comment_id != 'new' and not accepted:
-                    sys.stderr.write('Server refuses update to %s.' % comment_id)
+                    sys.stderr.write('Server refuses update to %s.' %
+                                     comment_id)
             return self.getComments()
 
         def _no_send(self, lines=[], push=None):
@@ -1393,14 +1417,14 @@ class BlogIt(object):
             >>> minimock.restore()
             """
             multicall = xmlrpclib.MultiCall(self.client)
-            for comment_typ in ( 'hold', 'spam', 'approve' ):
+            for comment_typ in ('hold', 'spam', 'approve'):
                 multicall.wp.getComments('', self.vim_vars.blog_username,
                         self.vim_vars.blog_password,
-                        { 'post_id': self.BLOG_POST_ID, 'status': comment_typ,
-                          'offset': offset, 'number': 1000 })
+                        {'post_id': self.BLOG_POST_ID, 'status': comment_typ,
+                         'offset': offset, 'number': 1000})
             self.empty_comment_list()
             for comments, heading in zip(multicall(),
-                    ( 'In Moderadation', 'Spam', 'Published' )):
+                    ('In Moderadation', 'Spam', 'Published')):
                 for comment_dict in comments:
                     self.add_comment(heading, comment_dict)
             if list(self.changed_comments(self.display())) != []:
@@ -1477,7 +1501,9 @@ class BlogIt(object):
             getattr(self, command)()
             return
 
-        def f(x): return x.startswith('command_' + command)
+        def f(x):
+            return x.startswith('command_' + command)
+
         matching_commands = filter(f, dir(self))
 
         if len(matching_commands) == 0:
@@ -1496,9 +1522,10 @@ class BlogIt(object):
             except Exception, e:
                 sys.stderr.write(e.message)
         else:
-            sys.stderr.write("Ambiguious command %s: %s." % ( command,
-                    ', '.join([ s.replace('command_', '', 1)
-                        for s in matching_commands ]) ))
+            sys.stderr.write("Ambiguious command %s: %s." %
+                             (command,
+                              ', '.join([s.replace('command_', '', 1)
+                                                for s in matching_commands])))
 
     def list_comments(self):
         if vim.current.line.startswith('Status: '):
@@ -1605,17 +1632,17 @@ class BlogIt(object):
             cut = len(args)
             if defaults:
                 cut -= len(defaults)
-            args = [ "{%s}" % a for a in args[skip:cut] ] + \
-                   [ "[%s]" % a for a in args[cut:] ]
+            args = ["{%s}" % a for a in args[skip:cut]] + \
+                   ["[%s]" % a for a in args[cut:]]
             if varargs:
                 args.append("[*%s]" % varargs)
             if varkw:
                 args.append("[**%s]" % varkw)
             return " ".join(args)
 
-        command = '%s %s' % ( f.func_name.replace('command_', ':Blogit '),
-                              getArguments(f) )
-        register_to.append('%-25s %s\n' % ( command, f.__doc__ ))
+        command = '%s %s' % (f.func_name.replace('command_', ':Blogit '),
+                             getArguments(f))
+        register_to.append('%-25s %s\n' % (command, f.__doc__))
         return f
 
     def get_vim_vars(self, blog_name=None):
@@ -1659,7 +1686,7 @@ class BlogIt(object):
         try:
             id = int(id)
         except ValueError:
-            if id in [ 'this', 'new' ]:
+            if id in ['this', 'new']:
                 self.command(id, blog)
                 return
             sys.stderr.write(
@@ -1758,8 +1785,8 @@ class BlogIt(object):
         multicall.wp.getCategories('', username, password)
         multicall.wp.getTags('', username, password)
         categories, tags = tuple(multicall())
-        tags = [ BlogIt.enc(tag['name']) for tag in tags ]
-        categories = [ BlogIt.enc(cat['categoryName']) for cat in categories ]
+        tags = [BlogIt.enc(tag['name']) for tag in tags]
+        categories = [BlogIt.enc(cat['categoryName']) for cat in categories]
         vim.command('let s:used_tags = %s' % BlogIt.to_vim_list(tags))
         vim.command('let s:used_categories = %s' %
                             BlogIt.to_vim_list(categories))

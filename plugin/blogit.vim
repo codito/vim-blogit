@@ -115,15 +115,6 @@ class BlogIt(object):
         r""" Helper function to encode ascii or unicode strings.
 
         Used when communicating with Vim buffers and commands.
-
-        >>> BlogIt.enc(u'bla')
-        'bla'
-        >>> BlogIt.enc('bla')
-        'bla'
-        >>> type(BlogIt.enc(u'\xc3'))
-        <type 'str'>
-        >>> BlogIt.enc(u'\xc3')
-        '\xc3\x83'
         """
         try:
             return text.encode('utf-8')
@@ -133,23 +124,7 @@ class BlogIt(object):
 
     @staticmethod
     def to_vim_list(L):
-        r""" Helper function to encode a List for ":let L = [ 'a', 'b' ]"
-
-        >>> BlogIt.to_vim_list([])
-        '[  ]'
-        >>> BlogIt.to_vim_list(['a'])
-        '[ "a" ]'
-        >>> BlogIt.to_vim_list(['a', 'b'])
-        '[ "a", "b" ]'
-        >>> BlogIt.to_vim_list(['a', 'b', 'c'])
-        '[ "a", "b", "c" ]'
-        >>> BlogIt.to_vim_list([r'\n']) == r'[ "\\n" ]'
-        True
-        >>> BlogIt.to_vim_list(['a"b']) == r'[ "a\"b" ]'
-        True
-        >>> BlogIt.to_vim_list(['B\xc3ume']) == '[ "B\xc3ume" ]'
-        True
-        """
+        """ Helper function to encode a List for ":let L = [ 'a', 'b' ]" """
         L = ['"%s"' % BlogIt.enc(item).replace('\\', '\\\\')
              .replace('"', r'\"') for item in L]
         return '[ %s ]' % ', '.join(L)

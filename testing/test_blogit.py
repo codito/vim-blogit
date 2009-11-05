@@ -25,3 +25,29 @@ def test_enc():
     assert BlogIt.enc(u'ä') == 'ä'
 
 
+def test_to_vim_list():
+    assert BlogIt.to_vim_list([]) == '[  ]'
+    assert BlogIt.to_vim_list(['a']) == '[ "a" ]'
+    assert BlogIt.to_vim_list(['a', 'b']) == '[ "a", "b" ]'
+    assert BlogIt.to_vim_list(['a', 'b', 'c']) == '[ "a", "b", "c" ]'
+    assert BlogIt.to_vim_list([r'\n']) == r'[ "\\n" ]'
+    assert BlogIt.to_vim_list(['a"b']) == r'[ "a\"b" ]'
+    assert BlogIt.to_vim_list(['Bäume']) == '[ "Bäume" ]'
+
+
+def test_vim_vars(vim_vars):
+    # Really tests mock_vim more than BlogIt.VimVars
+    u = vim_vars.blog_username    # to get better py.test debug message
+    assert u == 'user'
+    p = vim_vars.blog_password
+    assert p == 'password'
+    url = vim_vars.blog_url
+    assert url == 'http://example.com'
+    #assert vim_vars.blog_postsource
+    n = vim_vars.vim_blog_name
+    assert n == 'blogit'
+
+
+def pytest_funcarg__vim_vars(request):
+    return BlogIt.VimVars()
+

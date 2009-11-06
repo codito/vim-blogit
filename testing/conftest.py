@@ -17,6 +17,7 @@
 
 import py.test
 from functools import partial
+from minimock import Mock
 try:
     from . import mybloglogin
 except ImportError:
@@ -44,17 +45,29 @@ def assure_acceptence(config):
         py.test.skip('no blog login configured')
 
 
+def pytest_funcarg__accept_vim_vars(request):
+    blogconfig = request.getfuncargvalue('accept_blogconfig')
+    acceptance_vim_vars = Mock('VimVars')
+    vim_vars.blog_url = blogconfig.blog_url
+    vim_vars.blog_username = blogconfig.username
+    vim_vars.blog_password = blogconfig.password
+    vim_vars.blog_name = blogconfig.blog_name
+    return vim_vars
+
+
 class BlogConfig(object):
 
-    def __init__(self, blog_url, username, password, blog_name):
+    def __init__(self, blog_url, username, password, blog_name,
+                 postsource=False):
         self.blog_url = blog_url
         self.username = username
         self.password = password
         self.blog_name = blog_name
+        self.postsource = postsource
 
 
 def pytest_generate_tests(metafunc):
-    if not 'blogconfig' in metafunc.funcargnames:
+    if not 'accept_blogconfig' in metafunc.funcargnames:
         return
     assure_acceptence(metafunc.config)
     f_prefix = 'blog_login__'
@@ -64,4 +77,4 @@ def pytest_generate_tests(metafunc):
         f_basename = f_name.replace(f_prefix, '')
         constructor = partial(BlogConfig, blog_name=f_basename)
         blogconfig = getattr(mybloglogin, f_name)(constructor)
-        metafunc.addcall({'blogconfig': blogconfig}, id=f_basename)
+        metafunc.addcall({'accept_blogconfig': blogconfig}, id=f_basename)

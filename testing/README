@@ -33,9 +33,10 @@ Writing new Tests
 -----------------
 
 From the writing perspective there is no difference to other tests. Just use
-a funcarg belonging to the acceptance test. Like blogconfig::
+a funcarg belonging to the acceptance test (they are prefixed by 'accept_').
+Like accept_blogconfig or accept_vim_vars::
 
-    >>> def test_accept(blogconfig):
+    >>> def test_accept(accept_blogconfig):
     ...     # Should Fail
-    ...     assert blogconfig.blog_name == 'bla'
+    ...     assert accept_blogconfig.blog_name == 'bla'
 

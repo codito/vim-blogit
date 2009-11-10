@@ -16,6 +16,7 @@
 # Foundation, Inc., 59 Temple Place - Suite 330, Boston, MA 02111-1307, USA.
 
 import py.test
+from blogit import BlogIt
 from functools import partial
 from minimock import Mock
 try:
@@ -47,13 +48,28 @@ def assure_acceptence(config):
 
 def pytest_funcarg__accept_vim_vars(request):
     blogconfig = request.getfuncargvalue('accept_blogconfig')
-    acceptance_vim_vars = Mock('VimVars')
-    vim_vars.blog_url = blogconfig.blog_url
-    vim_vars.blog_username = blogconfig.username
-    vim_vars.blog_password = blogconfig.password
-    vim_vars.blog_name = blogconfig.blog_name
+    return create_mocked_vim_vars(blogconfig.blog_url, blogconfig.username,
+                                  blogconfig.password, blogconfig.blog_name)
+
+
+def create_mocked_vim_vars(blog_url, username, password, blog_name):
+    def vim_variable_mock(self, var_name, prefix=True):
+        if prefix:
+            var_name = '_'.join((self.blog_name, var_name))
+        return getattr(self, var_name)
+    vim_vars = Mock('VimVars')
+    vim_vars.vim_variable.returns_func = vim_variable_mock
+    vim_vars.blog_url = blog_url
+    vim_vars.blog_username = username
+    vim_vars.blog_password = password
+    vim_vars.blog_name = blog_name
+    vim_vars.blog_postsource = False
     return vim_vars
 
+def pytest_funcarg__mocked_vim_vars(request):
+    vim_vars = Mock('VimVars')
+    return create_mocked_vim_vars('http://example.com', 'a_blog_username',
+                                  'a_blog_password', 'a_blog_name')
 
 class BlogConfig(object):
 

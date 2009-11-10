@@ -19,6 +19,7 @@ import py.test
 from blogit import BlogIt
 from functools import partial
 from minimock import Mock
+from  functools import partial
 try:
     from . import mybloglogin
 except ImportError:
@@ -56,9 +57,11 @@ def create_mocked_vim_vars(blog_url, username, password, blog_name):
     def vim_variable_mock(self, var_name, prefix=True):
         if prefix:
             var_name = '_'.join((self.blog_name, var_name))
-        return getattr(self, var_name)
+        val = getattr(self, var_name)
+        return (val if not isinstance(val, Mock) else None)
     vim_vars = Mock('VimVars')
-    vim_vars.vim_variable.returns_func = vim_variable_mock
+    vim_vars.vim_variable.mock_returns_func = partial(vim_variable_mock,
+                                                      vim_vars)
     vim_vars.blog_url = blog_url
     vim_vars.blog_username = username
     vim_vars.blog_password = password

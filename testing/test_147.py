@@ -44,17 +44,18 @@ def test_pandoc(markdown_file):
         assert pandoc_out == expected_out
 
 
-def _test_read_post_body_with_pandoc(markdown, blog_post, post_header_line):
+def test_read_post_body_with_pandoc(markdown, blog_post, post_header_line):
     markdown_code, html_code, convert_code = markdown
     setattr(blog_post.vim_vars, blog_post.vim_vars.blog_name + '_format',
             convert_code)
     assert blog_post.vim_vars.a_blog_name_format == convert_code
     blogit_format_value = blog_post.vim_vars.vim_variable('format')
     assert blogit_format_value == convert_code
+    mocked_blog_name = blog_post.vim_vars.vim_variable('blog_name', False)
 
     buffer_lines = [post_header_line, ''] + markdown_code.splitlines()
     post_body = blog_post.read_post(buffer_lines)[blog_post.POST_BODY]
-    assert post_body == html_code
+    assert post_body == html_code.strip()
 
 
 def test_read_post_body(markdown, blog_post, post_header_line):

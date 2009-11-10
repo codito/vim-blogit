@@ -16,6 +16,8 @@
 # Foundation, Inc., 59 Temple Place - Suite 330, Boston, MA 02111-1307, USA.
 
 from blogit import BlogIt
+from xmlrpclib import DateTime
+import time
 
 
 def test_enc():
@@ -46,6 +48,27 @@ def test_vim_vars(vim_vars):
     #assert vim_vars.blog_postsource
     n = vim_vars.vim_blog_name
     assert n == 'blogit'
+
+
+def test_DateTime_to_str(monkeypatch):
+    monkeypatch.setenv('TZ', 'EST+05EDT,M4.1.0,M10.5.0')
+    time.tzset()
+    assert BlogIt.DateTime_to_str('invalid input') == ''
+    assert BlogIt.DateTime_to_str(DateTime('20090628T17:38:58'),
+                      '%a %b %d %H:%M:%S %Y') == 'Sun Jun 28 13:38:58 2009'
+
+
+def test_str_to_DateTime(monkeypatch):
+    monkeypatch.setenv('TZ', 'EST+05EDT,M4.1.0,M10.5.0')
+    time.tzset()
+    assert isinstance(BlogIt.str_to_DateTime(), DateTime)
+    assert str(BlogIt.str_to_DateTime('Sun Jun 28 19:38:58 2009',
+                                      '%a %b %d %H:%M:%S %Y'))\
+            == '20090628T23:38:58'
+
+    assert str(BlogIt.str_to_DateTime(BlogIt.DateTime_to_str(
+                                            DateTime('20090628T17:38:58'))))\
+            == '20090628T17:38:58'
 
 
 def pytest_funcarg__vim_vars(request):

@@ -1527,18 +1527,6 @@ class BlogIt(object):
 
     @staticmethod
     def str_to_DateTime(text='', format='%c'):
-        """
-        >>> BlogIt.str_to_DateTime()                    #doctest: +ELLIPSIS
-        <DateTime ...>
-
-        >>> BlogIt.str_to_DateTime('Sun Jun 28 19:38:58 2009',
-        ...         '%a %b %d %H:%M:%S %Y')             #doctest: +ELLIPSIS
-        <DateTime '20090628T17:38:58' at ...>
-
-        >>> BlogIt.str_to_DateTime(BlogIt.DateTime_to_str(
-        ...         DateTime('20090628T17:38:58')))     #doctest: +ELLIPSIS
-        <DateTime '20090628T17:38:58' at ...>
-        """
         if text == '':
             return DateTime('')
         else:
@@ -1551,14 +1539,6 @@ class BlogIt(object):
 
     @staticmethod
     def DateTime_to_str(date, format='%c'):
-        """
-        >>> BlogIt.DateTime_to_str(DateTime('20090628T17:38:58'),
-        ...         '%a %b %d %H:%M:%S %Y')
-        u'Sun Jun 28 19:38:58 2009'
-
-        >>> BlogIt.DateTime_to_str('invalid input')
-        ''
-        """
         try:
             return unicode(strftime(format,
                     localtime(timegm(strptime(str(date), '%Y%m%dT%H:%M:%S')))),

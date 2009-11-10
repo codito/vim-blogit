@@ -24,7 +24,7 @@ except ImportError:
     mybloglogin = None
 
 
-pytest_plugins = ['doctest']
+pytest_plugins = ['doctest', 'monkeypatch']
 collect_ignore = ['conftest.py', 'mybloglogin.py', '__init__.py']
 
 

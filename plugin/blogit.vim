@@ -1157,8 +1157,7 @@ class BlogIt(object):
             ...               )    #doctest: +ELLIPSIS
             Traceback (most recent call last):
                 ...
-                assert not comment_dict['comment_id'] in self.comment_list
-            AssertionError
+            AssertionError...
             """
             comment = BlogIt.Comment(comment_dict, self.meta_data_dict,
                                      self.HEADERS, self.POST_BODY)

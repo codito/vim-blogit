@@ -1,7 +1,9 @@
 #!/usr/bin/env python
+
+import doctest
+
 from minimock import Mock, AbstractTracker
 import minimock
-import doctest
 
 
 class Mock_Buffer(list):

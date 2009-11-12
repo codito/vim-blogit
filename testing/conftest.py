@@ -15,11 +15,13 @@
 # along with this program; if not, write to the Free Software
 # Foundation, Inc., 59 Temple Place - Suite 330, Boston, MA 02111-1307, USA.
 
-import py.test
-from blogit import BlogIt
+
 from functools import partial
+
+import py.test
 from minimock import Mock
-from  functools import partial
+
+from .blogit import BlogIt
 try:
     from . import mybloglogin
 except ImportError:
@@ -54,6 +56,7 @@ def pytest_funcarg__accept_vim_vars(request):
 
 
 def create_mocked_vim_vars(blog_url, username, password, blog_name):
+
     def vim_variable_mock(self, var_name, prefix=True):
         if prefix:
             var_name = '_'.join((self.blog_name, var_name))
@@ -69,10 +72,12 @@ def create_mocked_vim_vars(blog_url, username, password, blog_name):
     vim_vars.blog_postsource = False
     return vim_vars
 
+
 def pytest_funcarg__mocked_vim_vars(request):
     vim_vars = Mock('VimVars')
     return create_mocked_vim_vars('http://example.com', 'a_blog_username',
                                   'a_blog_password', 'a_blog_name')
+
 
 class BlogConfig(object):
 

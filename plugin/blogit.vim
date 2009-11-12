@@ -80,6 +80,7 @@ endfunction
 
 python <<EOF
 # Lets the python unit test ignore everything above this line (docstring). """
+
 import xmlrpclib
 import sys
 import re

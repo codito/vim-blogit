@@ -15,9 +15,11 @@
 # along with this program; if not, write to the Free Software
 # Foundation, Inc., 59 Temple Place - Suite 330, Boston, MA 02111-1307, USA.
 
-from blogit import BlogIt
+
 from xmlrpclib import DateTime
 import time
+
+from .blogit import BlogIt
 
 
 def test_enc():

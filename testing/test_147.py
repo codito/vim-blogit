@@ -20,13 +20,17 @@ debugging is done.
 
 .. _#147: http://symlink.me/issues/show/147
 """
+
+
 from __future__ import with_statement
+
 from subprocess import Popen, PIPE
 import hashlib
-from blogit import BlogIt
-import mock_vim
 from minimock import Mock
 import py
+
+from .blogit import BlogIt
+from . import mock_vim
 
 
 def test_pandoc(markdown_file):

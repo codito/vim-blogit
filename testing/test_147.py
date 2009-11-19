@@ -70,6 +70,17 @@ def test_read_post_body(markdown, blog_post, post_header_line):
     assert post_body == markdown_code.strip()
 
 
+def test_read_post_body_with_nonexistant(markdown, blog_post,
+                                         post_header_line):
+    markdown_code, html_code, convert_code = markdown
+    setattr(blog_post.vim_vars, blog_post.vim_vars.blog_name + '_format',
+            'ist_command_doesnt_exist_and_should_fail')
+
+    buffer_lines = [post_header_line, ''] + markdown_code.splitlines()
+    py.test.raises(BlogIt.FilterException,
+                   'blog_post.read_post(buffer_lines)[blog_post.POST_BODY]')
+
+
 def pytest_funcarg__markdown_file(request):
     return ('t.mkd', 't.html')
 

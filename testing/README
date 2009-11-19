@@ -9,8 +9,14 @@ Acceptance Test
 ===============
 
 Currently blogit.vim is in the process of including acceptance tests. These
-will need to have a test Blog with its login credentials. There are no plans to
-add acceptence test on the vim side.
+will need to have a test Blog with its login credentials.
+
+In addition there are tests which run in real vim. These tests require `execnet
+<http://codespeak.net/execnet/>` to be installed. As closing vim clears the
+terminal when it closes (and py.test captures the output on failers) you might
+want to redirect the output into a file::
+
+   $ py.test -A > out
 
 Setup
 -----

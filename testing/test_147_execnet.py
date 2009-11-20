@@ -19,8 +19,19 @@
 from __future__ import with_statement
 
 from subprocess import Popen
+import socket
+import SocketServer
+import time
 
 import py
+try:
+    import execnet
+except ImportError:
+    try:
+        from py import execnet
+    except ImportError:
+        execnet = None
+
 
 def test_with_execnet(vim_gateway):
     channel = vim_gateway.remote_exec("""
@@ -73,23 +84,6 @@ def test_blogit_format_setting(vim_gateway):
     assert buf == 'pandoc --from=markdown --to=html'
 
 
-def ____test_execnet_buffer_pickle(vim_gateway):
-    import pickle
-    channel = vim_gateway.remote_exec(r"""
-        import vim
-        vim.command('py import pickle')
-        vim.command('py import vim')
-        vim.command('py b = pickle.dumps([1, 2, 3])')
-        vim.command('py if b == "": b = "empty"')
-        vim.command('py vim.current.buffer[0] = b.split("\n")[0]')
-        vim.command('py if vim.current.buffer[0] == "": vim.current.buffer[0] = "broken"')
-        channel.send(vim.current.buffer[0])""")
-    buf = channel.receive()
-    channel.close()
-    assert buf != 'broken'    # fails
-    #assert '\n'.join(buf) == pickle.dumps([1, 2, 3])    # '(lp0\nI1\naI2\naI3\na.'
-
-
 def test_execnet_eval_pickle(vim_gateway):
     import pickle
     channel = vim_gateway.remote_exec(r"""
@@ -108,27 +102,22 @@ def test_execnet_eval_pickle(vim_gateway):
 def pytest_funcarg__vim_gateway(request):
     if not request.config.option.acceptance:
         py.test.skip('specify -A to run acceptance tests')
-    try:
-        import execnet
-    except ImportError:
-        try:
-            from py import execnet
-        except ImportError:
-            py.test.skip('Install execnet to run vim acceptance tests.')
-        vim_proc = Popen(['vim', '-c',
-                          'python import sys; sys.argv = ["localhost:8888"]',
-                          '-c', 'pyfile socketserver.py'])
-    while True:
-        try:
-            gw = execnet.SocketGateway('localhost', 8888)
-            break
-        except:
-            pass
+    if execnet is None:
+        py.test.skip('Install execnet to run vim acceptance tests.')
+    #skip_assert_port_available('localhost', 8888)
+    vim_proc = Popen(['vim', '-c', 'pyfile socketserver.py'])
+    # changing socketservers listen port fails:
+    # '-c', 'python import sys; sys.argv = ["localhost:7777"]',
+    gw = create_socket_gateway('localhost', 8888)
     def teardown():
         try:
             channel = gw.remote_exec('import vim; vim.command("q!")')
-            while vim_proc.poll() is None:
-                pass
+            for i in range(90):
+                if not vim_proc.poll() is None:
+                    break
+                time.sleep(1)
+            else:
+                vim_proc.kill()    # only works in python2.6+
             gw.exit()
         except:
             pass
@@ -136,3 +125,30 @@ def pytest_funcarg__vim_gateway(request):
     return gw
 
 
+def skip_assert_port_available(host, port):
+    """ Warning: Only works in python2.6+ """
+    try:
+        sock = SocketServer.TCPServer((host, port),
+                                        SocketServer.BaseRequestHandler)
+    except socket.error, e:
+        if e.args[0] == 98:
+            # 'Address already in use'
+            py.test.skip('Port %s is already in use.' % port)
+        else:
+            py.test.skip('Failed to start socketserver: %s.' % str(e.args))
+    finally:
+        sock.shutdown()    # needs python2.6+
+
+
+def create_socket_gateway(host, port):
+    for i in range(90):
+        try:
+            return execnet.SocketGateway(host, port)
+        except socket.error, e:
+            if e.args[0] == 111:
+                # 'Conection refused': Server isn't up, yet.
+                time.sleep(1)
+            else:
+                raise Exception(e.args)    #py.test doesn't like socket.error
+    else:
+        py.test.skip('failed to connect to vim via socketserver.')

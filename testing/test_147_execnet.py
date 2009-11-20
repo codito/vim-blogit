@@ -22,6 +22,7 @@ from subprocess import Popen
 import socket
 import SocketServer
 import time
+import os.path
 
 import py
 try:
@@ -55,7 +56,9 @@ def test_sending(vim_gateway):
 
 
 def test_blogit_preview(vim_gateway):
-    # XXX: delete .t.mkd.swp
+    if os.path.exists('.t.mkd.swp'):
+        py.test.skip('t.mkd is already opened with vim. Please close or ' +
+                     'remove .t.mkd.swp')
     channel = vim_gateway.remote_exec("""
         import vim
         vim.command('e t.mkd')
@@ -109,6 +112,7 @@ def pytest_funcarg__vim_gateway(request):
     # changing socketservers listen port fails:
     # '-c', 'python import sys; sys.argv = ["localhost:7777"]',
     gw = create_socket_gateway('localhost', 8888)
+
     def teardown():
         try:
             channel = gw.remote_exec('import vim; vim.command("q!")')

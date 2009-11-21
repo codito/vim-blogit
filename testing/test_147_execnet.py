@@ -73,8 +73,8 @@ def test_blogit_preview(vim_gateway):
     channel.close()
     with open('t.html') as f:
         text = f.read()
-    assert ''.join(buf).replace(' ', '') == \
-            ''.join(text.splitlines()).replace(' ', '')
+    assert (''.join(buf).replace(' ', '') ==
+            ''.join(text.splitlines()).replace(' ', ''))
 
 
 def test_blogit_format_setting(vim_gateway):
@@ -153,6 +153,6 @@ def create_socket_gateway(host, port):
                 # 'Conection refused': Server isn't up, yet.
                 time.sleep(1)
             else:
-                raise Exception(e.args)    #py.test doesn't like socket.error
+                raise
     else:
         py.test.skip('failed to connect to vim via socketserver.')

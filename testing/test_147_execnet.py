@@ -102,6 +102,55 @@ def test_execnet_eval_pickle(vim_gateway):
     assert buf == pickle.dumps([1, 2, 3])
 
 
+def test_execnet__receive_from_vim(vim_gateway):
+    channel = vim_gateway.vim_exec(r"""
+        vim.command('py bla = [1, 2, 3]')
+        channel.send(receive_from_vim('bla')) """)
+    buf = channel.receive()
+    channel.close()
+    assert buf == [1, 2, 3]
+
+
+def test_execnet__send_to_vim(vim_gateway):
+    channel = vim_gateway.vim_exec(r"""
+        while True:
+            send_to_vim('bla', channel.receive())
+            channel.send(receive_from_vim('bla')) """)
+    for obj in ([1, 2, 3], 'abcd', 'ab"cd', "ab'cd", 'ab\\cd', 'ab\ncd'):
+        channel.send(obj)
+        buf = channel.receive()
+        assert buf == obj
+
+
+def code_decorator__vim_exec(code):
+    post_code = py.code.Source(code)     # deindent code
+    pre_code = py.code.Source(r"""
+        import vim
+        import pickle
+        vim.command('py import pickle')
+        vim.command('py import vim')
+        vim.command('pyfile vim_execnet.py')
+
+        def vim_str(text):
+            ''' Returns the vim code sniplet containing a given string.
+
+            Code doubled in vim_execnet.py
+            '''
+            return '"%s"' % text.replace('\\', '\\\\').replace('"', '\\"')
+
+        def receive_from_vim(var_name):
+            vim.command("py vim.command('''let execnet=%s ''' % " +
+                        'vim_str(pickle.dumps(%s)))' % var_name)
+            return pickle.loads(vim.eval("execnet"))
+
+        def send_to_vim(var_name, val):
+            vim.command('let execnet=%s ' % vim_str(pickle.dumps(val)))
+            vim.command("py %s = pickle.loads(vim.eval('execnet'))" % var_name)
+
+        """)
+    return str(pre_code) + str(post_code)
+
+
 def pytest_funcarg__vim_gateway(request):
     if not request.config.option.acceptance:
         py.test.skip('specify -A to run acceptance tests')
@@ -113,6 +162,8 @@ def pytest_funcarg__vim_gateway(request):
     #       '-c', 'python import sys; sys.argv = ["localhost:7777"]',
     #   Capture vim's stdout so it doesn't hide py.test's error messages.
     gw = create_socket_gateway('localhost', 8888)
+    setattr(gw, 'vim_exec',
+            lambda code: gw.remote_exec(code_decorator__vim_exec(code)))
 
     def teardown():
         try:

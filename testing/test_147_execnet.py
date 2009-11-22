@@ -18,7 +18,7 @@
 
 from __future__ import with_statement
 
-from subprocess import Popen
+from subprocess import Popen, PIPE
 import socket
 import SocketServer
 import time
@@ -108,9 +108,10 @@ def pytest_funcarg__vim_gateway(request):
     if execnet is None:
         py.test.skip('Install execnet to run vim acceptance tests.')
     #skip_assert_port_available('localhost', 8888)
-    vim_proc = Popen(['vim', '-c', 'pyfile socketserver.py'])
-    # changing socketservers listen port fails:
-    # '-c', 'python import sys; sys.argv = ["localhost:7777"]',
+    vim_proc = Popen(['vim', '-c', 'pyfile socketserver.py'], stdout=PIPE)
+    #   changing socketservers listen port fails:
+    #       '-c', 'python import sys; sys.argv = ["localhost:7777"]',
+    #   Capture vim's stdout so it doesn't hide py.test's error messages.
     gw = create_socket_gateway('localhost', 8888)
 
     def teardown():

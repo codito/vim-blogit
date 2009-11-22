@@ -73,8 +73,29 @@ def test_blogit_preview(vim_gateway):
     channel.close()
     with open('t.html') as f:
         text = f.read()
-    assert (''.join(buf).replace(' ', '') ==
-            ''.join(text.splitlines()).replace(' ', ''))
+    assert_same_html(''.join(buf), text)
+
+
+def assert_same_html(one, two):
+    " assert strings are identical ignoring the whitespace "
+    assert (one.replace(' ', '').replace('\n', '') ==
+            two.replace(' ', '').replace('\n', ''))
+
+
+def test_blogit_format(vim_gateway):
+    channel = vim_gateway.vim_exec("""
+        vim.command('Blogit new')
+        send_to_vim('execnet', channel.receive())
+        vim.command('py execnet = blogit.current_post.format(execnet)')
+        channel.send(receive_from_vim('execnet'))
+        """)
+    with open('t.mkd') as f:
+        mkd_text = f.read()
+    with open('t.html') as f:
+        html_text = f.read()
+    channel.send(mkd_text)
+    buf = channel.receive()
+    assert_same_html(buf, html_text)
 
 
 def test_blogit_format_setting(vim_gateway):

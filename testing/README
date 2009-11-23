@@ -1,5 +1,5 @@
 blogit.vim requires `py.test`_ and `MiniMock`_ to run the tests. To run the
-tests simply run `py.test` in this folder.
+tests simply run ``py.test`` in this folder (the testing-directory).
 
 .. _py.test: http://codespeak.net/py/dist/test/index.html
 .. _MiniMock: http://pypi.python.org/pypi/MiniMock/
@@ -8,25 +8,24 @@ tests simply run `py.test` in this folder.
 Acceptance Test
 ===============
 
-Currently blogit.vim is in the process of including acceptance tests. These
-will need to have a test Blog with its login credentials.
+There are two different type of acceptance tests. Tests including real vim
+instances and tests including real blogs.
 
-In addition there are tests which run in real vim. These tests require `execnet
-<http://codespeak.net/execnet/>` to be installed. As closing vim clears the
-terminal when it closes (and py.test captures the output on failers) you might
-want to redirect the output into a file::
+The earlier requires `execnet <http://codespeak.net/execnet/>` to be installed.
+The later (none written, yet tough) require some configuration (see `Blog
+Acceptance Tests Setup`_).
 
-   $ py.test -A > out
+To run them, just add the option '-A'. If you didn't meet the requirements the test will simply be skipped with an explaining why.
 
-Setup
------
+Blog Acceptance Tests Setup
+---------------------------
 
 .. warning::
    Don't use a Blog account that you use for anything but bug testing. These
    tests cat include writing and changing of Blog posts.
 
-In the test-directory create the file mybloglogin.py and add for each Blog you
-want to test a function like this::
+In the testing-directory create the file mybloglogin.py and add for each Blog
+you want to test a function like this::
 
     >>> def blog_login__myblogname(constructor):
     ...     return constructor('myxmlrpcurl', 'myusername', 'mypassword')
@@ -35,12 +34,13 @@ Replace myblogname, myxmlrpcurl, myuername and mypassword with the values
 your would set in blogit.vim for that blog (blog_name, blogit_url,
 blogit_username, blogit_password).
 
+-----------------
 Writing new Tests
 -----------------
 
-From the writing perspective there is no difference to other tests. Just use
-a funcarg belonging to the acceptance test (they are prefixed by 'accept_').
-Like accept_blogconfig or accept_vim_vars::
+From the writing perspective there is no difference to other tests. Just use a
+funcarg belonging to the acceptance test (they are often prefixed by
+``accept_``). Like accept_blogconfig, accept_vim_vars or vim_gateway::
 
     >>> def test_accept(accept_blogconfig):
     ...     # Should Fail

@@ -98,9 +98,9 @@ def pytest_funcarg__post_header_line(request):
 
 def pytest_funcarg__markdown(request):
     markdown_file = request.getfuncargvalue('markdown_file')
-    pandoc_base_cmd = 'pandoc --from=markdown --to=html --no-wrap'
+    pandoc_base_cmd = 'pandoc --from=markdown --to=html'
     pandoc_process = Popen(['pandoc', '--from=markdown', '--to=html',
-                            '--no-wrap', markdown_file[0]],
+                            markdown_file[0]],
                            stdout=PIPE, stderr=PIPE)
     pandoc_process.wait()
     if pandoc_process.returncode != 0:

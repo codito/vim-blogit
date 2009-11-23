@@ -33,6 +33,8 @@ except ImportError:
     except ImportError:
         execnet = None
 
+from .test_147 import pytest_funcarg__markdown, pytest_funcarg__markdown_file
+
 
 def test_with_execnet(vim_gateway):
     channel = vim_gateway.remote_exec("""
@@ -55,13 +57,14 @@ def test_sending(vim_gateway):
     assert buf == 'hello'
 
 
-def test_blogit_preview(vim_gateway):
-    if os.path.exists('.t.mkd.swp'):
-        py.test.skip('t.mkd is already opened with vim. Please close or ' +
-                     'remove .t.mkd.swp')
+def test_blogit_preview(vim_gateway, markdown_file):
+    mkd_file, html_file = markdown_file
+    if os.path.exists('.%s.swp' % mkd_file):
+        py.test.skip(('%s is already opened with vim. Please close or ' +
+                      'remove .%s.swp') % (mkd_file, mkd_file))
     channel = vim_gateway.remote_exec("""
         import vim
-        vim.command('e t.mkd')
+        vim.command('e ' + channel.receive())
         vim.command('Blogit this')
         vim.command('py p = blogit.current_post')
         vim.command('py vim.current.buffer[:] = ' +
@@ -69,9 +72,10 @@ def test_blogit_preview(vim_gateway):
                     '.splitlines()')
         channel.send(vim.current.buffer[:])
         """)
+    channel.send(mkd_file)
     buf = channel.receive()
     channel.close()
-    with open('t.html') as f:
+    with open(html_file) as f:
         text = f.read()
     assert_same_html(''.join(buf), text)
 
@@ -82,30 +86,72 @@ def assert_same_html(one, two):
             two.replace(' ', '').replace('\n', ''))
 
 
-def test_blogit_format(vim_gateway):
+def test_blogit_format(vim_gateway, markdown):
     channel = vim_gateway.vim_exec("""
         vim.command('Blogit new')
         send_to_vim('execnet', channel.receive())
         vim.command('py execnet = blogit.current_post.format(execnet)')
         channel.send(receive_from_vim('execnet'))
         """)
-    with open('t.mkd') as f:
-        mkd_text = f.read()
-    with open('t.html') as f:
-        html_text = f.read()
+    mkd_text, html_text, convert_code = markdown
     channel.send(mkd_text)
     buf = channel.receive()
     assert_same_html(buf, html_text)
 
 
-def test_blogit_format_setting(vim_gateway):
+def test_blogit_filter(vim_gateway, markdown):
+    channel = vim_gateway.vim_exec("""
+        vim.command('Blogit new')
+        send_to_vim('execnet', channel.receive())
+        vim.command('py execnet = blogit.current_post.filter(execnet, ' +
+                                                            '"format")')
+        channel.send(receive_from_vim('execnet'))
+        """)
+    mkd_text, html_text, convert_code = markdown
+    channel.send(mkd_text)
+    buf = channel.receive()
+    assert_same_html(buf, html_text)
+
+
+def test_blogit_filter_mocked_vim_vars(vim_gateway, markdown):
+    channel = vim_gateway.vim_exec("""
+        vim.command('Blogit new')
+        vim.command('py from minimock import Mock')
+        vim.command('py blogit.vim_vars.vim_variable = Mock("vim_var", ' +
+                                            'returns="%s"' % channel.receive())
+        send_to_vim('execnet', channel.receive())
+        vim.command('py execnet = blogit.current_post.filter(execnet, ' +
+                                                            '"format")')
+        channel.send(receive_from_vim('execnet'))
+        """)
+    mkd_text, html_text, convert_code = markdown
+    channel.send(convert_code)
+    channel.send(mkd_text)
+    buf = channel.receive()
+    assert_same_html(buf, html_text)
+
+
+def test_blogit_format_setting(vim_gateway, markdown):
     channel = vim_gateway.remote_exec("""
         import vim
         channel.send(vim.eval('blogit_format'))
         """)
+    convert_code = markdown[2]
     buf = channel.receive()
     channel.close()
-    assert buf == 'pandoc --from=markdown --to=html'
+    assert buf == convert_code
+
+
+def test_blogit_format_vim_varibale(vim_gateway, markdown):
+    channel = vim_gateway.vim_exec("""
+        vim.command('Blogit new')
+        vim.command('py execnet = blogit.current_post.vim_vars.vim_variable(' +
+                                                                   '"format")')
+        channel.send(receive_from_vim('execnet'))
+        """)
+    convert_code = markdown[2]
+    buf = channel.receive()
+    assert buf == convert_code
 
 
 def test_execnet_eval_pickle(vim_gateway):

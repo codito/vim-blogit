@@ -34,8 +34,8 @@ from . import mock_vim
 
 
 def test_pandoc(markdown_file):
-    pandoc_process = Popen(['pandoc', '--from=markdown', '--to=html',
-                            '--no-wrap', markdown_file[0]],
+    mkd_file, html_file, convert_code = markdown_file
+    pandoc_process = Popen(convert_code.split() + [mkd_file],
                            stdout=PIPE, stderr=PIPE)
     pandoc_process.wait()
     # pandoc's magic can't handle this directly in the assert.
@@ -43,7 +43,7 @@ def test_pandoc(markdown_file):
     pandoc_out = pandoc_process.stdout.read()
     assert pandoc_err == ''
     assert pandoc_process.returncode == 0
-    with open(markdown_file[1]) as f_html:
+    with open(html_file) as f_html:
         expected_out = f_html.read()
         assert pandoc_out == expected_out
 
@@ -89,7 +89,7 @@ def test_read_post_body_with_nonexistant(markdown, blog_post,
 
 
 def pytest_funcarg__markdown_file(request):
-    return ('t.mkd', 't.html')
+    return ('t.mkd', 't.html', 'pandoc --from=markdown --to=html --no-wrap')
 
 
 def pytest_funcarg__blog_post(request):
@@ -104,15 +104,14 @@ def pytest_funcarg__post_header_line(request):
 
 
 def pytest_funcarg__markdown(request):
-    markdown_file = request.getfuncargvalue('markdown_file')
-    pandoc_base_cmd = 'pandoc --from=markdown --to=html'
-    pandoc_process = Popen(['pandoc', '--from=markdown', '--to=html',
-                            markdown_file[0]],
+    mkd_file, html_file, convert_code = \
+            request.getfuncargvalue('markdown_file')
+    pandoc_process = Popen(convert_code.split() + [mkd_file],
                            stdout=PIPE, stderr=PIPE)
     pandoc_process.wait()
     if pandoc_process.returncode != 0:
         py.test.skip('pandoc returned with error')
-    with open(markdown_file[0]) as f_mkd:
-        return (f_mkd.read(), pandoc_process.stdout.read(), pandoc_base_cmd)
+    with open(mkd_file) as f_mkd:
+        return (f_mkd.read(), pandoc_process.stdout.read(), convert_code)
 
 

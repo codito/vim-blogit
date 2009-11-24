@@ -62,6 +62,13 @@ def test_read_post_body_with_pandoc(markdown, blog_post, post_header_line):
     assert post_body == html_code.strip()
 
 
+def test_filter_with_pandoc(markdown, blog_post):
+    markdown_code, html_code, convert_code = markdown
+    blog_post.vim_vars.vim_variable = Mock("vim_varibale",
+                                           returns=convert_code)
+    assert html_code == blog_post.filter(markdown_code, 'format')
+
+
 def test_read_post_body(markdown, blog_post, post_header_line):
     markdown_code, html_code, convert_code = markdown
 

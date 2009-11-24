@@ -117,8 +117,8 @@ def test_blogit_filter_mocked_vim_vars(vim_gateway, markdown):
     channel = vim_gateway.vim_exec("""
         vim.command('Blogit new')
         vim.command('py from minimock import Mock')
-        vim.command('py blogit.vim_vars.vim_variable = Mock("vim_var", ' +
-                                            'returns="%s"' % channel.receive())
+        vim.command('py blogit.current_post.vim_vars.vim_variable = ' +
+                    'Mock("vim_variable", returns="%s")' % channel.receive())
         send_to_vim('execnet', channel.receive())
         vim.command('py execnet = blogit.current_post.filter(execnet, ' +
                                                             '"format")')

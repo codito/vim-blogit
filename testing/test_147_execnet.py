@@ -145,6 +145,23 @@ def test_blogit_format_setting(vim_gateway, markdown):
     assert buf == convert_code
 
 
+def test_blogit_format_setting_blog_name_format(vim_gateway, markdown):
+    channel = vim_gateway.remote_exec("""
+        import vim
+        try:
+            blog = vim.eval('blog_name')
+        except vim.error:
+            blog = 'blogit'
+        try:
+            channel.send(vim.eval(blog + '_format'))
+        except vim.error:
+            channel.send("%s_format is unset." % blog)
+        """)
+    convert_code = markdown[2]
+    buf = channel.receive()
+    assert buf == convert_code
+
+
 @py.test.mark.xfail
 def test_blogit_format_vim_varibale(vim_gateway, markdown):
     channel = vim_gateway.vim_exec("""

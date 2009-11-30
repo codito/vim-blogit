@@ -93,6 +93,11 @@ from inspect import getargspec
 import webbrowser
 import tempfile
 import warnings
+import gettext
+from functools import partial
+
+gettext.textdomain('blogit')
+_ = gettext.gettext
 
 try:
     import vim
@@ -1546,7 +1551,7 @@ class BlogIt(object):
         except ValueError:
             return ''
 
-    def vimcommand(f, register_to=vimcommand_help):
+    def register_vimcommand(f, doc_string, register_to=vimcommand_help):
         r"""
         >>> class C:
         ...     def command_f(self):
@@ -1558,17 +1563,18 @@ class BlogIt(object):
         ...     def command_h(self, one, two=None):
         ...         ' A method with an optional arguments. '
         >>> L = []
-        >>> BlogIt.vimcommand(C.command_f, L)
+        >>> vim_cmd = lambda f, L: BlogIt.register_vimcommand(f, f.__doc__, L)
+        >>> vim_cmd(C.command_f, L)
         <unbound method C.command_f>
         >>> L
         [':Blogit f                  A method. \n']
 
-        >>> BlogIt.vimcommand(C.command_g, L)
+        >>> vim_cmd(C.command_g, L)
         <unbound method C.command_g>
         >>> L     #doctest: +NORMALIZE_WHITESPACE
         [':Blogit f                  A method. \n',
          ':Blogit g {one} {two}      A method with arguments. \n']
-        >>> BlogIt.vimcommand(C.command_h, L)
+        >>> vim_cmd(C.command_h, L)
         <unbound method C.command_h>
         >>> L     #doctest: +NORMALIZE_WHITESPACE
         [':Blogit f                  A method. \n',
@@ -1597,8 +1603,11 @@ class BlogIt(object):
 
         command = '%s %s' % (f.func_name.replace('command_', ':Blogit '),
                              getArguments(f))
-        register_to.append('%-25s %s\n' % (command, f.__doc__))
+        register_to.append('%-25s %s\n' % (command, doc_string))
         return f
+
+    def vimcommand(doc_string, f=register_vimcommand):
+        return partial(f, doc_string=doc_string)
 
     def get_vim_vars(self, blog_name=None):
         if blog_name is not None:
@@ -1606,9 +1615,8 @@ class BlogIt(object):
         else:
             return self.current_post.vim_vars
 
-    @vimcommand
+    @vimcommand(_("list all posts"))
     def command_ls(self, blog=None):
-        """ list all posts """
         vim_vars = self.get_vim_vars(blog)
         vim.command('botright new')
         try:
@@ -1617,16 +1625,14 @@ class BlogIt(object):
             vim.command('bdelete')
             sys.stderr.write("There are no posts.")
 
-    @vimcommand
+    @vimcommand(_("create a new post"))
     def command_new(self, blog=None):
-        """ create a new post """
         vim_vars = self.get_vim_vars(blog)
         vim.command('enew')
         self.current_post = BlogIt.WordPressBlogPost.create_new_post(vim_vars)
 
-    @vimcommand
+    @vimcommand(_("make this a blog post"))
     def command_this(self, blog=None):
-        """ make this a blog post """
         if self.current_post is self.NO_POST:
             vim_vars = self.get_vim_vars(blog)
             self.current_post = BlogIt.WordPressBlogPost.create_new_post(
@@ -1634,9 +1640,8 @@ class BlogIt(object):
         else:
             sys.stderr.write("Already editing a post.")
 
-    @vimcommand
+    @vimcommand(_("edit a post"))
     def command_edit(self, id, blog=None):
-        """ edit a post """
         vim_vars = self.get_vim_vars(blog)
         try:
             id = int(id)
@@ -1658,9 +1663,8 @@ class BlogIt(object):
             post.init_vim_buffer()
             self.current_post = post
 
-    @vimcommand
+    @vimcommand(_("edit a page"))
     def command_page(self, id, blog=None):
-        """ edit a page """
         # copied from command_edit
         vim_vars = self.get_vim_vars(blog)
 
@@ -1689,30 +1693,26 @@ class BlogIt(object):
             post.init_vim_buffer()
         self.current_post = post
 
-    @vimcommand
+    @vimcommand(_("commit current post or comments"))
     def command_commit(self):
-        """ commit current post or comments """
         p = self.current_post
         p.send(vim.current.buffer[:])
         p.refresh_vim_buffer()
 
-    @vimcommand
+    @vimcommand(_("publish post"))
     def command_push(self):
-        """ publish post """
         p = self.current_post
         p.send(vim.current.buffer[:], push=1)
         p.refresh_vim_buffer()
 
-    @vimcommand
+    @vimcommand(_("unpublish post"))
     def command_unpush(self):
-        """ unpublish post """
         p = self.current_post
         p.send(vim.current.buffer[:], push=0)
         p.refresh_vim_buffer()
 
-    @vimcommand
+    @vimcommand(_("remove a post"))
     def command_rm(self, id):
-        """ remove a post """
         p = self.current_post
         try:
             id = int(id)
@@ -1731,9 +1731,8 @@ class BlogIt(object):
             return
         sys.stdout.write('Article removed')
 
-    @vimcommand
+    @vimcommand(_("update and list tags and categories"))
     def command_tags(self):
-        """ update and list tags and categories"""
         p = self.current_post
         username, password = p.vim_vars.blog_username, p.vim_vars.blog_password
         multicall = xmlrpclib.MultiCall(p.client)
@@ -1749,9 +1748,8 @@ class BlogIt(object):
                          ', '.join(categories))
         sys.stdout.write('\n \n \nTags\n====\n \n' + ', '.join(tags))
 
-    @vimcommand
+    @vimcommand(_("preview current post locally"))
     def command_preview(self):
-        """ preview current post locally """
         p = self.current_post
         if isinstance(p, BlogIt.CommentList):
             raise Blogit.NoPostException
@@ -1763,16 +1761,15 @@ class BlogIt(object):
         f.close()
         webbrowser.open(self.prev_file)
 
-    @vimcommand
+    @vimcommand(_("display this notice"))
     def command_help(self):
-        """ display this notice """
         sys.stdout.write("Available commands:\n")
         for f in self.vimcommand_help:
             sys.stdout.write('   ' + f)
 
     # needed for testing. Prevents beeing used as a decorator if it isn't at
     # the end.
-    vimcommand = staticmethod(vimcommand)
+    register_vimcommand = staticmethod(register_vimcommand)
 
 
 blogit = BlogIt()

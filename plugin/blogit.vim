@@ -886,7 +886,7 @@ class BlogIt(object):
                             self.vim_vars.blog_password, self.post_data, push)
 
             self.read_post(lines)
-            if push == 1 or push == 0:
+            if push == 0 or self.get_server_var__post_status() == 'draft':
                 self.set_server_var__Date_AS_DateTime(DateTime())
             self.post_data.update(self.new_post_data)
             push_dict = {0: 'draft', 1: 'publish',

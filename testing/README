@@ -34,7 +34,6 @@ Replace myblogname, myxmlrpcurl, myuername and mypassword with the values
 your would set in blogit.vim for that blog (blog_name, blogit_url,
 blogit_username, blogit_password).
 
------------------
 Writing new Tests
 -----------------
 

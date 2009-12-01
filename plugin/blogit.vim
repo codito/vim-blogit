@@ -1693,19 +1693,19 @@ class BlogIt(object):
             post.init_vim_buffer()
         self.current_post = post
 
-    @vimcommand(_("commit current post or comments"))
+    @vimcommand(_("save article"))
     def command_commit(self):
         p = self.current_post
         p.send(vim.current.buffer[:])
         p.refresh_vim_buffer()
 
-    @vimcommand(_("publish post"))
+    @vimcommand(_("publish article"))
     def command_push(self):
         p = self.current_post
         p.send(vim.current.buffer[:], push=1)
         p.refresh_vim_buffer()
 
-    @vimcommand(_("unpublish post"))
+    @vimcommand(_("unpublish article (save as draft)"))
     def command_unpush(self):
         p = self.current_post
         p.send(vim.current.buffer[:], push=0)
@@ -1748,7 +1748,7 @@ class BlogIt(object):
                          ', '.join(categories))
         sys.stdout.write('\n \n \nTags\n====\n \n' + ', '.join(tags))
 
-    @vimcommand(_("preview current post locally"))
+    @vimcommand(_("preview article in browser"))
     def command_preview(self):
         p = self.current_post
         if isinstance(p, BlogIt.CommentList):

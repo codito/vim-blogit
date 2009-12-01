@@ -45,7 +45,7 @@ B. Links                |blogit-links|
         Show tags and categories list.
 
 :Blogit preview                     *:Blogit-preview*
-        Preview current post locally.
+        Preview article in browser.
 
 :Blogit help                        *:Blogit-help*
         Display help.
@@ -87,6 +87,7 @@ as an aditional argument, e.g.:
 >
     Blogit edit 42 your_blog_name
 <
+
 ==============================================================================
 3. Usage                            *blogit-usage*
 

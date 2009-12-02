@@ -33,7 +33,7 @@ collect_ignore = ['conftest.py', 'mybloglogin.py', '__init__.py']
 
 
 def pytest_addoption(parser):
-    group = parser.getgroup('')
+    group = parser.getgroup('blogit.vim')
     group.addoption('-A', dest='acceptance', action='store_true',
                     help='run (slow) acceptance tests')
 

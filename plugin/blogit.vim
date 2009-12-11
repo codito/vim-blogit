@@ -1546,8 +1546,8 @@ class BlogIt(object):
     def DateTime_to_str(date, format='%c'):
         try:
             return unicode(strftime(format,
-                    localtime(timegm(strptime(str(date), '%Y%m%dT%H:%M:%S')))),
-                    getpreferredencoding(), 'ignore')
+                                    strptime(str(date), '%Y%m%dT%H:%M:%S')),
+                           getpreferredencoding(), 'ignore')
         except ValueError:
             return ''
 

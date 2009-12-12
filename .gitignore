@@ -1,3 +1,5 @@
 /testing/mybloglogin.py
-/po/blogit.pot
+/doc/blogit.??x
+/po/*.pot
+/po/po4a.cfg
 *.pyc

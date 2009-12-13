@@ -57,7 +57,7 @@ def test_DateTime_to_str(monkeypatch):
     time.tzset()
     assert BlogIt.DateTime_to_str('invalid input') == ''
     assert BlogIt.DateTime_to_str(DateTime('20090628T17:38:58'),
-                      '%a %b %d %H:%M:%S %Y') == 'Sun Jun 28 13:38:58 2009'
+                      '%a %b %d %H:%M:%S %Y') == 'Sun Jun 28 17:38:58 2009'
 
 
 def test_str_to_DateTime(monkeypatch):
@@ -66,7 +66,7 @@ def test_str_to_DateTime(monkeypatch):
     assert isinstance(BlogIt.str_to_DateTime(), DateTime)
     assert str(BlogIt.str_to_DateTime('Sun Jun 28 19:38:58 2009',
                                       '%a %b %d %H:%M:%S %Y'))\
-            == '20090628T23:38:58'
+            == '20090628T19:38:58'
 
     assert str(BlogIt.str_to_DateTime(BlogIt.DateTime_to_str(
                                             DateTime('20090628T17:38:58'))))\

@@ -1540,7 +1540,7 @@ class BlogIt(object):
             except UnicodeDecodeError:
                 text = text.decode('utf-8').encode(getpreferredencoding())
             text = strptime(text, format)
-        return DateTime(strftime('%Y%m%dT%H:%M:%S', gmtime(mktime(text))))
+        return DateTime(strftime('%Y%m%dT%H:%M:%S', text))
 
     @staticmethod
     def DateTime_to_str(date, format='%c'):

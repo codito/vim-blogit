@@ -28,11 +28,12 @@ In the testing-directory create the file mybloglogin.py and add for each Blog
 you want to test a function like this::
 
     >>> def blog_login__myblogname(constructor):
-    ...     return constructor('myxmlrpcurl', 'myusername', 'mypassword')
+    ...     return constructor(ids, 'myxmlrpcurl', 'myusername', 'mypassword')
 
 Replace myblogname, myxmlrpcurl, myuername and mypassword with the values
 your would set in blogit.vim for that blog (blog_name, blogit_url,
-blogit_username, blogit_password).
+blogit_username, blogit_password).  ids is a dictionary so the tests can find
+which the post or comment needed for the test.
 
 Writing new Tests
 -----------------

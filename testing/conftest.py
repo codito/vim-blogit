@@ -55,6 +55,11 @@ def pytest_funcarg__accept_vim_vars(request):
                                   blogconfig.password, blogconfig.blog_name)
 
 
+def create_mocked_vim_vars_from_blogconfig(blog_config):
+    return create_mocked_vim_vars(blog_config.blog_url, blog_config.username,
+                                  blog_config.password, blog_config.blog_name)
+
+
 def create_mocked_vim_vars(blog_url, username, password, blog_name):
 
     def vim_variable_mock(self, var_name, prefix=True):
@@ -81,8 +86,9 @@ def pytest_funcarg__mocked_vim_vars(request):
 
 class BlogConfig(object):
 
-    def __init__(self, blog_url, username, password, blog_name,
+    def __init__(self, post_ids, blog_url, username, password, blog_name,
                  postsource=False):
+        self.post_ids = post_ids
         self.blog_url = blog_url
         self.username = username
         self.password = password

@@ -254,6 +254,10 @@ class BlogIt(object):
             self.refresh_vim_buffer()
 
         def send(self, lines=[], push=None):
+            self.read_post(lines)
+            self.do_send(push)
+
+        def do_send(self, push=None):
             raise BlogIt.NoPostException
 
 
@@ -858,8 +862,8 @@ class BlogIt(object):
                 client = xmlrpclib.ServerProxy(self.vim_vars.blog_url)
             self.client = client
 
-        def send(self, lines, push=None):
-            """ Send current post to server.
+        def do_send(self, push=None):
+            """ Send post to server.
 
             >>> mock('sys.stderr')
             >>> p = BlogIt.WordPressBlogPost(42,
@@ -885,7 +889,6 @@ class BlogIt(object):
                             self.vim_vars.blog_username,
                             self.vim_vars.blog_password, self.post_data, push)
 
-            self.read_post(lines)
             if push == 0 or self.get_server_var__post_status() == 'draft':
                 self.set_server_var__Date_AS_DateTime(DateTime())
             self.post_data.update(self.new_post_data)
@@ -1031,8 +1034,7 @@ class BlogIt(object):
                 client = xmlrpclib.ServerProxy(self.vim_vars.blog_url)
             self.client = client
 
-        def send(self, lines, push=None):
-            self.read_post(lines)
+        def do_send(self, push=None):
             if push == 1:
                 self.set_server_var__Date_AS_DateTime(DateTime())
                 self.set_server_var__Status_post('publish')

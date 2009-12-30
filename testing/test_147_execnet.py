@@ -98,21 +98,26 @@ def assert_same_html(one, two):
             two.replace(' ', '').replace('\n', ''))
 
 
-def test_blogit_format(vim_gateway, markdown_setting):
+def test_blogit_format(vim_gateway, markdown):
     channel = vim_gateway.vim_exec("""
+        vim.command('source pytest_setup.vim')
+        vim.command('let pytest_format="%s"' % channel.receive())
         vim.command('Blogit new')
         send_to_vim('execnet', channel.receive())
         vim.command('py execnet = blogit.current_post.format(execnet)')
         channel.send(receive_from_vim('execnet'))
         """)
     mkd_text, html_text, convert_code = markdown
+    channel.send(convert_code)
     channel.send(mkd_text)
     buf = channel.receive()
     assert buf == html_text
 
 
-def test_blogit_filter(vim_gateway, markdown_setting):
+def test_blogit_filter(vim_gateway, markdown):
     channel = vim_gateway.vim_exec("""
+        vim.command('source pytest_setup.vim')
+        vim.command('let pytest_format="%s"' % channel.receive())
         vim.command('Blogit new')
         send_to_vim('execnet', channel.receive())
         vim.command('py execnet = blogit.current_post.filter(execnet, ' +
@@ -120,6 +125,7 @@ def test_blogit_filter(vim_gateway, markdown_setting):
         channel.send(receive_from_vim('execnet'))
         """)
     mkd_text, html_text, convert_code = markdown
+    channel.send(convert_code)
     channel.send(mkd_text)
     buf = channel.receive()
     assert buf == html_text

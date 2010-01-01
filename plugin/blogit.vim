@@ -1,5 +1,5 @@
 """
-" Copyright (C) 2009 Romain Bignon
+" Copyright (C) 2009-2010 Romain Bignon
 "
 " This program is free software; you can redistribute it and/or modify
 " it under the terms of the GNU General Public License as published by
@@ -17,8 +17,8 @@
 " Maintainer:   Romain Bignon
 " Contributor:  Adam Schmalhofer
 " URL:          http://symlink.me/wiki/blogit
-" Version:      1.4.2
-" Last Change:  2009 October 28
+" Version:      1.4.3
+" Last Change:  2010 January 01
 
 
 runtime! passwords.vim

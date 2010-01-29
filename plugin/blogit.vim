@@ -417,6 +417,7 @@ class BlogIt(object):
 
 
     class AbstractPost(AbstractBufferIO):
+        BLOG_POST_ID = ''
 
         class BlogItServerVarUndefined(Exception):
 

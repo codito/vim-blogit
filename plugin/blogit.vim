@@ -730,7 +730,7 @@ class BlogIt(object):
             try:
                 return self.filter(text, 'unformat')
             except BlogIt.FilterException, e:
-                sys.stderr.write(e.message)
+                sys.stderr.write(unicode(e))
                 return e.input_text
 
         def format(self, text):
@@ -823,7 +823,7 @@ class BlogIt(object):
             except BlogIt.FilterException:
                 raise
             except Exception, e:
-                raise BlogIt.FilterException(e.message, text, filter)
+                raise BlogIt.FilterException(unicode(e), text, filter)
 
         def display_body(self):
             """
@@ -1503,7 +1503,7 @@ class BlogIt(object):
                 except:
                     sys.stderr.write('%s' % e)
             except Exception, e:
-                sys.stderr.write(e.message)
+                sys.stderr.write(unicode(e))
         else:
             sys.stderr.write("Ambiguious command %s: %s." %
                              (command,
@@ -1520,7 +1520,7 @@ class BlogIt(object):
             except BlogIt.BlogItBug, e:
                 p.init_vim_buffer()
                 vim.command('setlocal nomodifiable')
-                sys.stderr.write(e.message)
+                sys.stderr.write(unicode(e))
             else:
                 p.init_vim_buffer()
 

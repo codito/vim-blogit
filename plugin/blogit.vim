@@ -94,6 +94,8 @@ import webbrowser
 import tempfile
 import warnings
 import gettext
+import urllib, urllib2
+import json
 from functools import partial
 
 gettext.textdomain('blogit')
@@ -169,6 +171,13 @@ class BlogIt(object):
             self.blog_name = blog_name
 
         @property
+        def blog_clienttype(self):
+            client_type = self.vim_variable('clienttype')
+            if client_type is None:
+                client_type = "wordpress"
+            return client_type
+
+        @property
         def blog_username(self):
             return self.vim_variable('username')
 
@@ -212,7 +221,7 @@ class BlogIt(object):
             return 'blogit'
 
         def vim_variable(self, var_name, prefix=True):
-            """ Simplefy access to vim-variables. """
+            """ Simplify access to vim-variables. """
             if prefix:
                 var_name = '_'.join((self.blog_name, var_name))
             if vim.eval("exists('%s')" % var_name) == '1':
@@ -227,12 +236,94 @@ class BlogIt(object):
             vim.command("let b:blog_post_type='%s'" % post.POST_TYPE)
 
 
+    class BlogClient(object):
+        """Abstracts client specific behavior. Currently three types of clients are supported:
+            - MetaWeblog (Implementation: xmlrpc.metaWeblog)
+            - Wordpress (Implementation: xmlrpc.metaWeblog + xmlrpc.wp)
+            - Tumblr (Implementation: tumblr REST api)
+        """
+
+        def __init__(self, vim_vars=None):
+            if (vim_vars == None):
+                vim_vars = BlogIt.VimVars()
+            self.vim_vars = vim_vars
+            self.blog_type = vim_vars.blog_clienttype
+            self.client_instance = None
+            return
+
+        def get_date_format(self):
+            """Returns the date format for Posts, Pages etc."""
+            date_format = '%Y%m%dT%H:%M:%S'
+            if self.blog_type == "tumblr":
+                date_format = '%Y-%m-%d %H:%M:%S %Z'
+            return date_format
+
+        def get_post_groups(self):
+            post_group_types = [BlogIt.MetaWeblogPostListingPosts,
+                         BlogIt.WordPressPostListingPages]
+
+            if (self.blog_type == "metaweblog"):
+                post_group_types = [BlogIt.MetaWeblogPostListingPosts]
+            elif (self.blog_type == "tumblr"):
+                post_group_types = [BlogIt.TumblrPostListingPosts]
+
+            return [group(self.vim_vars) for group in post_group_types]
+
+        def get_posts(self, post_type):
+            """Possible post types:
+                - MetaWeblog: Text (aka normal blog post)
+                - Wordpress: [MetaWeblog], Page
+                - Tumblr: Text, Photo, Quote, Link, Chat, Audio, Video
+            """
+            data = None
+            if post_type == "text":
+                if self.blog_type == "metaweblog" or self.blog_type == "wordpress":
+                    data = self._get_client_instance().metaWeblog.getRecentPosts('',
+                                                                                 self.vim_vars.blog_username,
+                                                                                 self.vim_vars.blog_password)
+                elif self.blog_type == "tumblr":
+                    params = {}
+                    params["type"] = "text"
+                    data = self._tumblr_http_post(self.vim_vars.blog_url + "/api/read/json", params)
+            elif post_type == "page":
+                if self.blog_type == "wordpress":
+                    data = self._get_client_instance().wp.getPageList('',
+                                                                      self.vim_vars.blog_username,
+                                                                      self.vim_vars.blog_password)
+            return data
+
+        def _get_client_instance(self):
+            if self.client_instance is None:
+                if self.blog_type == "metaweblog" or self.blog_type == "wordpress":
+                    self.client_instance = xmlrpclib.ServerProxy(self.vim_vars.blog_url)
+            return self.client_instance
+
+        def _http_post_response(self, url, params):
+            data = urllib.urlencode(params)
+            req = urllib2.Request(url, data)
+            try:
+                ret = urllib2.urlopen(req)
+                return ret.read()
+            except urllib2.HTTPError, e:
+                print e.read()
+                raise e
+ 
+        def _tumblr_http_post(self, url, params = {}):
+            params["email"] = self.vim_vars.blog_username
+            params["password"] = self.vim_vars.blog_password
+            params["generator"] = "vim-blogit"
+
+            server_response = self._http_post_response(url, params)
+            m = re.match("^.*?({.*}).*$", server_response, re.DOTALL | re.MULTILINE)
+            post_data = json.loads(m.group(1))["posts"]
+            return post_data
+
     class NoPost(object):
         BLOG_POST_ID = ''
 
         @property
         def client(self):
-            return xmlrpclib.ServerProxy(self.vim_vars.blog_url)
+            return BlogIt.BlogClient(self.vim_vars)
 
         @property
         def vim_vars(self):
@@ -264,18 +355,15 @@ class BlogIt(object):
     class PostListing(AbstractBufferIO):
         POST_TYPE = 'list'
 
-        def __init__(self, vim_vars=None, client=None, row_types=None):
+        def __init__(self, vim_vars=None, client=None):
             if vim_vars is None:
                 vim_vars = BlogIt.VimVars()
             self.vim_vars = vim_vars
             if client is None:
-                client = xmlrpclib.ServerProxy(self.vim_vars.blog_url)
+                client = BlogIt.BlogClient(self.vim_vars)
             self.client = client
             self.post_data = None
-            if row_types is None:
-                row_types = (BlogIt.MetaWeblogPostListingPosts,
-                             BlogIt.WordPressPostListingPages)
-            self.row_groups = [group(vim_vars) for group in row_types]
+            self.row_groups = self.client.get_post_groups()
 
         @classmethod
         def create_new_post(cls, vim_vars, body_lines=['']):
@@ -325,21 +413,19 @@ class BlogIt(object):
                 raise BlogIt.PostListingEmptyException
             id_column_width = max(2, *[p.min_id_column_width
                                             for p in self.row_groups])
-            yield "%sID    Date%sTitle" % (' ' * (id_column_width - 2),
+            yield "ID    %sDate%sTitle" % (' ' * (id_column_width - 2),
                     ' ' * len(BlogIt.DateTime_to_str(DateTime(), '%x')))
             format = '%%%dd    %%s    %%s' % id_column_width
             for row_group in self.row_groups:
                 for post_id, date, title in row_group.rows_data():
                     yield format % (int(post_id),
-                                    BlogIt.DateTime_to_str(date, '%x'),
+                                    BlogIt.DateTime_to_str(date, '%x', self.client.get_date_format()),
                                     title)
 
         def getPost(self):
-            multicall = xmlrpclib.MultiCall(self.client)
+            #FIXME is it possible to use multicalls with current refactoring?
             for row_group in self.row_groups:
-                row_group.xmlrpc_call__getPost(multicall)
-            for row_group, response in zip(self.row_groups, multicall()):
-                row_group.getPost(response)
+                row_group.getPost(self.client)
 
         def open_row(self, n):
             n -= 2    # Table header & vim_buffer lines start at 1
@@ -357,8 +443,12 @@ class BlogIt(object):
             self.vim_vars = vim_vars
             self.post_data = []
 
-        def getPost(self, server_response):
-            self.post_data = server_response
+        def client_call__getPost(self, client):
+            """Must be implemented by inherited classes"""
+            raise NotImplementedError
+
+        def getPost(self, client):
+            self.post_data = self.client_call__getPost(client)
 
         @property
         def is_empty(self):
@@ -383,9 +473,8 @@ class BlogIt(object):
                   self).__init__(('postid', 'date_created_gmt', 'title'),
                                  vim_vars)
 
-        def xmlrpc_call__getPost(self, multicall):
-            multicall.metaWeblog.getRecentPosts('',
-                    self.vim_vars.blog_username, self.vim_vars.blog_password)
+        def client_call__getPost(self, client):
+            return client.get_posts("text")
 
         def open_row(self, n):
             id = self.post_data[n]['postid']
@@ -399,13 +488,28 @@ class BlogIt(object):
                   self).__init__(('page_id', 'dateCreated', 'page_title'),
                                  vim_vars)
 
-        def xmlrpc_call__getPost(self, multicall):
-            multicall.wp.getPageList('',
-                    self.vim_vars.blog_username, self.vim_vars.blog_password)
+        def client_call__getPost(self, client):
+            return client.get_posts("page")
 
         def open_row(self, n):
             id = self.post_data[n]['page_id']
             return BlogIt.WordPressPage(id, vim_vars=self.vim_vars)
+
+
+    class TumblrPostListingPosts(AbstractPostListingSource):
+
+        def __init__(self, vim_vars):
+            super(BlogIt.TumblrPostListingPosts,
+                  self).__init__(('id', 'date-gmt', 'regular-title'),
+                                 vim_vars)
+
+        def client_call__getPost(self, client):
+            return client.get_posts("text")
+
+        def open_row(self, n):
+            id = self.post_data[n]['id']
+            return BlogIt.WordPressPage(id, vim_vars=self.vim_vars)
+
 
     class PostModel(object):
 
@@ -1498,6 +1602,7 @@ class BlogIt(object):
                 sys.stderr.write('No Post in current buffer.')
             except TypeError, e:
                 try:
+                    print e.read()
                     sys.stderr.write("Command %s takes %s arguments." % \
                             (command, int(str(e).split(' ')[3]) - 1))
                 except:
@@ -1546,12 +1651,13 @@ class BlogIt(object):
         return DateTime(strftime('%Y%m%dT%H:%M:%S', text))
 
     @staticmethod
-    def DateTime_to_str(date, format='%c'):
+    def DateTime_to_str(date, output_format='%c', input_format='%Y%m%dT%H:%M:%S'):
         try:
-            return unicode(strftime(format,
-                                    strptime(str(date), '%Y%m%dT%H:%M:%S')),
+            return unicode(strftime(output_format,
+                                    strptime(str(date), input_format)),
                            getpreferredencoding(), 'ignore')
-        except ValueError:
+        except ValueError, e:
+            print e
             return ''
 
     def register_vimcommand(f, doc_string, register_to=vimcommand_help):

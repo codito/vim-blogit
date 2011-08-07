@@ -236,67 +236,50 @@ class BlogIt(object):
             vim.command("let b:blog_post_type='%s'" % post.POST_TYPE)
 
 
-    class BlogClient(object):
+    class AbstractBlogClient(object):
         """Abstracts client specific behavior. Currently three types of clients are supported:
-            - MetaWeblog (Implementation: xmlrpc.metaWeblog)
-            - Wordpress (Implementation: xmlrpc.metaWeblog + xmlrpc.wp)
-            - Tumblr (Implementation: tumblr REST api)
+            - MetaWeblog (Implementation: xmlrpc.metaWeblog). See MetaWebblogBlogClient.
+            - Wordpress (Implementation: xmlrpc.metaWeblog + xmlrpc.wp). See WordPressBlogClient.
+            - Tumblr (Implementation: tumblr REST api). See TumblrBlogClient.
         """
 
-        def __init__(self, vim_vars=None):
+        def __new__(cls, vim_vars=None):
+            import pdb
+            """Factory pattern to choose the appropriate blog client implementation based on
+            variables.
+            """
             if (vim_vars == None):
                 vim_vars = BlogIt.VimVars()
-            self.vim_vars = vim_vars
-            self.blog_type = vim_vars.blog_clienttype
-            self.client_instance = None
-            return
+            cls.vim_vars = vim_vars
+            cls.client_instance = None
+            blog_type = BlogIt.MetaWeblogBlogClient
+            if cls.vim_vars.blog_clienttype == "wordpress":
+                blog_type = BlogIt.WordPressBlogClient
+            if cls.vim_vars.blog_clienttype == "tumblr":
+                blog_type = BlogIt.TumblrBlogClient
+            return object.__new__(blog_type)
 
         def get_date_format(self):
-            """Returns the date format for Posts, Pages etc."""
-            date_format = '%Y%m%dT%H:%M:%S'
-            if self.blog_type == "tumblr":
-                date_format = '%Y-%m-%d %H:%M:%S %Z'
-            return date_format
+            """Returns the date format for Posts, Pages etc. Default format is suitable for
+            Metaweblog and Wordpress.
+            """
+            return '%Y%m%dT%H:%M:%S'
 
         def get_post_groups(self):
-            post_group_types = [BlogIt.MetaWeblogPostListingPosts,
-                         BlogIt.WordPressPostListingPages]
-
-            if (self.blog_type == "metaweblog"):
-                post_group_types = [BlogIt.MetaWeblogPostListingPosts]
-            elif (self.blog_type == "tumblr"):
-                post_group_types = [BlogIt.TumblrPostListingPosts]
-
-            return [group(self.vim_vars) for group in post_group_types]
+            """Returns the post types supported by this blog client."""
+            return [group(self.vim_vars) for group in self._get_post_group_types()]
 
         def get_posts(self, post_type):
-            """Possible post types:
-                - MetaWeblog: Text (aka normal blog post)
-                - Wordpress: [MetaWeblog], Page
-                - Tumblr: Text, Photo, Quote, Link, Chat, Audio, Video
+            """Gets the posts of type <post_type> from the blog. Must be implemented by derived
+            clients.
             """
-            data = None
-            if post_type == "text":
-                if self.blog_type == "metaweblog" or self.blog_type == "wordpress":
-                    data = self._get_client_instance().metaWeblog.getRecentPosts('',
-                                                                                 self.vim_vars.blog_username,
-                                                                                 self.vim_vars.blog_password)
-                elif self.blog_type == "tumblr":
-                    params = {}
-                    params["type"] = "text"
-                    data = self._tumblr_http_post(self.vim_vars.blog_url + "/api/read/json", params)
-            elif post_type == "page":
-                if self.blog_type == "wordpress":
-                    data = self._get_client_instance().wp.getPageList('',
-                                                                      self.vim_vars.blog_username,
-                                                                      self.vim_vars.blog_password)
-            return data
+            raise NotImplementedError("get_posts is not implemented in %s" % str(self))
 
-        def _get_client_instance(self):
-            if self.client_instance is None:
-                if self.blog_type == "metaweblog" or self.blog_type == "wordpress":
-                    self.client_instance = xmlrpclib.ServerProxy(self.vim_vars.blog_url)
-            return self.client_instance
+        def _get_post_group_types(self):
+            """Gets a tuple of types of posts supported by the blog. Must be implemented by derived
+            clients.
+            """
+            raise NotImplementedError("_get_post_group_types is not implemented in %s" % str(self))
 
         def _http_post_response(self, url, params):
             data = urllib.urlencode(params)
@@ -307,7 +290,68 @@ class BlogIt(object):
             except urllib2.HTTPError, e:
                 print e.read()
                 raise e
- 
+
+
+    class MetaWeblogBlogClient(AbstractBlogClient):
+        def get_posts(self, post_type):
+            """Possible post types:
+                - MetaWeblog: Text (aka normal blog post)
+            """
+            data = None
+            if post_type == "text":
+                data = self._get_client_instance().metaWeblog.getRecentPosts('',
+                                                                             self.vim_vars.blog_username,
+                                                                             self.vim_vars.blog_password)
+            return data
+
+        def _get_client_instance(self):
+            if self.client_instance is None:
+                self.client_instance = xmlrpclib.ServerProxy(self.vim_vars.blog_url)
+            return self.client_instance
+
+        def _get_post_group_types(self):
+            return [BlogIt.MetaWeblogPostListingPosts]
+
+
+    class WordPressBlogClient(MetaWeblogBlogClient):
+        def get_posts(self, post_type):
+            """Possible post types:
+                - MetaWeblog: Text (aka normal blog post)
+                - Wordpress: [MetaWeblog], Page
+            """
+            data = None
+            if post_type == "text":
+                data = self._get_client_instance().metaWeblog.getRecentPosts('',
+                                                                             self.vim_vars.blog_username,
+                                                                             self.vim_vars.blog_password)
+            elif post_type == "page":
+                data = self._get_client_instance().wp.getPageList('',
+                                                                  self.vim_vars.blog_username,
+                                                                  self.vim_vars.blog_password)
+            return data
+
+        def _get_post_group_types(self):
+            return [BlogIt.MetaWeblogPostListingPosts, BlogIt.WordPressPostListingPages]
+
+
+    class TumblrBlogClient(AbstractBlogClient):
+        def get_date_format(self):
+            return '%Y-%m-%d %H:%M:%S %Z'
+
+        def get_posts(self, post_type):
+            """Possible post types: Text
+            Supported post types in Tumblr: Text, Photo, Quote, Link, Chat, Audio, Video.
+            """
+            data = None
+            if post_type == "text":
+                params = {}
+                params["type"] = "text"
+                data = self._tumblr_http_post(self.vim_vars.blog_url + "/api/read/json", params)
+            return data
+
+        def _get_post_group_types(self):
+            return [BlogIt.TumblrPostListingPosts]
+
         def _tumblr_http_post(self, url, params = {}):
             params["email"] = self.vim_vars.blog_username
             params["password"] = self.vim_vars.blog_password
@@ -318,12 +362,13 @@ class BlogIt(object):
             post_data = json.loads(m.group(1))["posts"]
             return post_data
 
+
     class NoPost(object):
         BLOG_POST_ID = ''
 
         @property
         def client(self):
-            return BlogIt.BlogClient(self.vim_vars)
+            return BlogIt.AbstractBlogClient(self.vim_vars)
 
         @property
         def vim_vars(self):
@@ -360,7 +405,7 @@ class BlogIt(object):
                 vim_vars = BlogIt.VimVars()
             self.vim_vars = vim_vars
             if client is None:
-                client = BlogIt.BlogClient(self.vim_vars)
+                client = BlogIt.AbstractBlogClient(self.vim_vars)
             self.client = client
             self.post_data = None
             self.row_groups = self.client.get_post_groups()

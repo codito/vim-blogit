@@ -259,6 +259,10 @@ class BlogIt(object):
                 blog_type = BlogIt.TumblrBlogClient
             return object.__new__(blog_type)
 
+        def create_new_post(self, post_content=[''], post_type=None):
+            """Creates a new blog post. Must be implemented by derived clients."""
+            raise NotImplementedError("create_new_post is not implemented in %s" % str(self))
+
         def get_date_format(self):
             """Returns the date format for Posts, Pages etc. Default format is suitable for
             Metaweblog and Wordpress.
@@ -314,6 +318,9 @@ class BlogIt(object):
 
 
     class WordPressBlogClient(MetaWeblogBlogClient):
+        def create_new_post(self, post_content=[''], post_type=None):
+            return BlogIt.WordPressBlogPost.create_new_post(self.vim_vars, post_content)
+
         def get_posts(self, post_type):
             """Possible post types:
                 - MetaWeblog: Text (aka normal blog post)
@@ -335,6 +342,9 @@ class BlogIt(object):
 
 
     class TumblrBlogClient(AbstractBlogClient):
+        def create_new_post(self, post_content=[''], post_type=None):
+            return BlogIt.TumblrBlogPost.create_new_post(self.vim_vars, post_content)
+
         def get_date_format(self):
             return '%Y-%m-%d %H:%M:%S %Z'
 
@@ -1119,6 +1129,10 @@ class BlogIt(object):
             return b
 
 
+    class TumblrBlogPost(BlogPost):
+        pass
+
+
     class Page(BlogPost):
         POST_TYPE = 'page'
 
@@ -1783,14 +1797,13 @@ class BlogIt(object):
     def command_new(self, blog=None):
         vim_vars = self.get_vim_vars(blog)
         vim.command('enew')
-        self.current_post = BlogIt.WordPressBlogPost.create_new_post(vim_vars)
+        self.current_post = BlogIt.AbstractBlogClient(vim_vars).create_new_post()
 
     @vimcommand(_("make this a blog post"))
     def command_this(self, blog=None):
         if self.current_post is self.NO_POST:
             vim_vars = self.get_vim_vars(blog)
-            self.current_post = BlogIt.WordPressBlogPost.create_new_post(
-                    vim_vars, vim.current.buffer[:])
+            self.current_post = BlogIt.AbstractBlogClient(vim_vars).create_new_post(post_content=vim.current.buffer[:])
         else:
             sys.stderr.write("Already editing a post.")
 

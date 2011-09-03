@@ -60,6 +60,7 @@ class MockVim(object):
                       'blogit_username': 'user',
                       'blogit_password': 'password',
                       'blogit_url': 'http://example.com',
+                      'blogit_clienttype': 'wordpress',
                      }
 
     def __init__(self, vim, vim_vars=None):

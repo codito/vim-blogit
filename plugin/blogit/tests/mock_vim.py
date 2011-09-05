@@ -1,10 +1,7 @@
 #!/usr/bin/env python
 
 import doctest
-
 from minimock import Mock, AbstractTracker
-import minimock
-
 
 class Mock_Buffer(list):
     number = 3
@@ -69,7 +66,12 @@ class MockVim(object):
             vim_vars = self.DUMMY_VIM_VARS
         self.vim_vars = vim_vars
         self.update_eval_commands()
+
+        vim.command = self.vim_command
         vim.eval = self.vim_eval
+
+    def vim_command(self, cmd):
+        pass
 
     def vim_eval(self, command):
         try:

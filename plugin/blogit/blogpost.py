@@ -17,32 +17,25 @@ else:
     doctest = None
 
 class AbstractPost(blogclient.AbstractBufferIO):
-    BLOG_POST_ID = ''
+    """Handles the presentation of blog post metadata to the user in a vim buffer. There are three
+    data structures used primarily:
+        - meta_data_dict: mapping of "fields shown to user" to "fields expected by server".
+        E.g. 'Subject' in vim buffer = 'post[title]' in posterous API
+        - post_data: initial dictionary of values (as expected by a server) for a blog post
+        - headers:
+
+    Other interesting piece are 'Converters'. They just convert the <val> "FIELD: val" to a python
+    object. E.g. 'Categories' in wordpress is list of strings; the conversion happens at {get,
+    set}_server_var__Categories() methods.
+    """
 
     class BlogItServerVarUndefined(Exception):
         def __init__(self, label):
             super(AbstractPost.BlogItServerVarUndefined, self).__init__('Unknown: %s.' % label)
             self.label = label
 
-    def __init__(self, post_data={}, meta_data_dict={}, headers=[],
-                 post_body=''):
-        """
-        >>> AbstractPost(headers=['a', 'b', 'c']).meta_data_dict
-        {'Body': '', 'a': 'a', 'c': 'c', 'b': 'b'}
-        """
-        self.post_data = post_data
-        self.new_post_data = {}
-        self.meta_data_dict = {'Body': post_body}
-        for h in headers:
-            self.meta_data_dict[h] = h
-        self.meta_data_dict.update(meta_data_dict)
-        self.meta_data_dict['Body'] = post_body
-        self.HEADERS = headers
-        self.POST_BODY = post_body   # for transition
-
     def __getattr__(self, name):
         """
-
         >>> p = AbstractPost()
         >>> mock('p.get_server_var_default', tracker=None)
         >>> mock('p.display_header_default', tracker=None)
@@ -54,7 +47,6 @@ class AbstractPost(blogclient.AbstractBufferIO):
         True
         >>> minimock.restore()
         """
-
         def base_name():
             start = name.find('__') + 2
             return name[start:]
@@ -68,6 +60,21 @@ class AbstractPost(blogclient.AbstractBufferIO):
         elif name.startswith('read_header__'):
             return lambda val: self.read_header_default(base_name(), val)
         raise AttributeError
+
+    def init_vim_buffer(self, post_data={}, meta_data_dict={}, headers=[], post_body=''):
+        """
+        >>> AbstractPost().init_vim_buffer(headers=['a', 'b', 'c']).meta_data_dict
+        {'Body': '', 'a': 'a', 'c': 'c', 'b': 'b'}
+        """
+        self.post_data = post_data
+        self.new_post_data = {}
+        self.meta_data_dict = {}
+        for h in headers:
+            self.meta_data_dict[h] = h
+        self.meta_data_dict.update(meta_data_dict)
+        self.HEADERS = headers
+        self.POST_BODY = post_body   # for transition
+        super(AbstractPost, self).init_vim_buffer()
 
     def read_header(self, line):
         """ Reads the meta-data line as used in a vim buffer.
@@ -108,9 +115,10 @@ class AbstractPost(blogclient.AbstractBufferIO):
         return self.new_post_data
 
     def display(self):
+        """Returns the lines in buffer after conversion using meta_data_dict/headers."""
         for label in self.HEADERS:
             yield self.display_header(label)
-        yield ''
+        yield ' '   # empty line break for differentiating HEADER and BODY later      
         for line in self.display_body():
             yield line
 
@@ -142,6 +150,9 @@ class AbstractPost(blogclient.AbstractBufferIO):
         text = getattr(self, 'display_header__' + label)()
         return '%s: %s' % (label, unicode(text).encode('utf-8'))
 
+    def display_body(self):
+        raise NotImplementedError
+
     def display_header_default(self, label):
         return getattr(self, 'get_server_var__' + label)()
 
@@ -150,7 +161,6 @@ class AbstractPost(blogclient.AbstractBufferIO):
 
     def get_server_var_default(self, label):
         """
-
         >>> AbstractPost().get_server_var_default('foo')
         '<foo>'
         >>> AbstractPost().get_server_var_default('foo_AS_bar'
@@ -253,19 +263,56 @@ class AbstractPost(blogclient.AbstractBufferIO):
             raise self.BlogItServerVarUndefined(label)
 
 
-class BlogPost(AbstractPost):
+class AbstractBlogPost(AbstractPost):
+    """Base for all blog posts and pages. Each blog client must provide own implementation."""
     POST_TYPE = 'post'
+    BLOG_POST_ID = ''
 
-    def __init__(self, blog_post_id, post_data={}, meta_data_dict={},
-                 headers=None, post_body='description', vim_vars=None):
-        if headers is None:
-            headers = ['From', 'Id', 'Subject', 'Status',
-                       'Categories', 'Tags', 'Date']
-        if vim_vars is None:
+    def __new__(cls, *args, **kwargs):
+        """Factory pattern to choose the appropriate blog post implementation based on
+        variables.
+        """
+        from blogit.clients import posterous, wordpress, tumblr
+
+        vim_vars = kwargs['vim_vars']
+        if (vim_vars == None):
             vim_vars = utils.VimVars()
-        super(BlogPost, self).__init__(post_data, meta_data_dict, headers, post_body)
+        cls.vim_vars = vim_vars
+        post_type = wordpress.WordPressBlogPost
+        if cls.vim_vars.blog_clienttype == "tumblr":
+            post_type = tumblr.TumblrBlogPost
+        elif cls.vim_vars.blog_clienttype == "posterous":
+            post_type = posterous.PosterousBlogPost
+        return object.__new__(post_type, *args, **kwargs)
+
+    def __init__(self, vim_vars=None):
+        super(AbstractBlogPost, self).__init__()
         self.vim_vars = vim_vars
-        self.BLOG_POST_ID = blog_post_id
+
+    def get_headers(self):
+        """Returns the metadata dictionary mapping for the server. Must be implemented by client."""
+        raise NotImplementedError
+
+    def get_meta_data_dict(self):
+        """Returns the metadata dictionary mapping for the server. Must be implemented by client."""
+        raise NotImplementedError
+
+    def get_post_data(self):
+        """Returns the post_data mapping for the server. Must be implemented by client."""
+        raise NotImplementedError
+
+    def create_new_post(self, post_body=['']):
+        """
+        >>> mock('vim.command', tracker=None)
+        >>> mock('vim.mocked_eval', tracker=None)
+        >>> WordPressBlogPost.create_new_post(utils.VimVars())     #doctest: +ELLIPSIS
+        time data '' does not match format '%Y%m%dT%H:%M:%S'
+        <blogit.clients.wordpress.WordPressBlogPost object at 0x...>
+        >>> minimock.restore()
+        """
+        self.init_vim_buffer()
+        if post_body != ['']:
+            vim.current.buffer[-1:] = post_body
 
     def display_header__Status(self):
         d = self.get_server_var__Status_AS_dict()
@@ -283,10 +330,12 @@ class BlogPost(AbstractPost):
                 + s) % d
 
     def init_vim_buffer(self):
-        super(BlogPost, self).init_vim_buffer()
+        super(AbstractBlogPost, self).init_vim_buffer(post_data=self.get_post_data(),
+                                                      meta_data_dict=self.get_meta_data_dict(),
+                                                      headers=self.get_headers(),
+                                                      post_body='')
         vim.command('nnoremap <buffer> gf :Blogit! list_comments<cr>')
-        vim.command('setlocal ft=mail textwidth=0 ' +
-                             'completefunc=BlogItComplete')
+        vim.command('setlocal ft=mail textwidth=0 completefunc=BlogItComplete')
         vim.current.window.cursor = (8, 0)
 
     def read_header__Body(self, text):
@@ -438,7 +487,7 @@ class BlogPost(AbstractPost):
                 yield line
 
 
-class Page(BlogPost):
+class Page(AbstractBlogPost):
     POST_TYPE = 'page'
 
     def __init__(self, blog_post_id, post_data={}, meta_data_dict={},
@@ -465,7 +514,7 @@ class Page(BlogPost):
         id, page = re.match('(\d*) *\((.*)\)', text).group(1, 2)
         self.set_server_var__Page(page)
         #super(BlogIt.Page, self).read_header__Id(id)
-        BlogPost.read_header_default(self, 'Id', id)
+        AbstractBlogPost.read_header_default(self, 'Id', id)
 
     def display_header__Id(self):
         """
@@ -476,7 +525,7 @@ class Page(BlogPost):
         >>> minimock.restore()
         """
         #super(BlogIt.Page, self).display_header__Id()
-        return '%s (%s)' % (BlogPost.display_header_default(self, 'Id'),
+        return '%s (%s)' % (AbstractBlogPost.display_header_default(self, 'Id'),
                             self.get_server_var__Page())
 
 if doctest is not None:

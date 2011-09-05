@@ -232,15 +232,21 @@ class BlogIt(object):
 
     @vimcommand(_("create a new post"))
     def command_new(self, blog=None):
+        from blogit import blogpost
+
         vim_vars = self.get_vim_vars(blog)
         vim.command('enew')
-        self.current_post = blogclient.AbstractBlogClient(vim_vars).create_new_post()
+        self.current_post = blogpost.AbstractBlogPost(vim_vars=vim_vars)
+        self.current_post.create_new_post()
 
     @vimcommand(_("make this a blog post"))
     def command_this(self, blog=None):
+        from blogit import blogpost
+
         if self.current_post is self.NO_POST:
             vim_vars = self.get_vim_vars(blog)
-            self.current_post = BlogIt.AbstractBlogClient(vim_vars).create_new_post(post_content=vim.current.buffer[:])
+            self.current_post = blogpost.AbstractBlogPost(vim_vars = vim_vars)
+            self.current_post.create_new_post(post_body=vim.current.buffer[:])
         else:
             sys.stderr.write("Already editing a post.")
 
@@ -356,7 +362,7 @@ class BlogIt(object):
     def command_preview(self):
         p = self.current_post
         if isinstance(p, BlogIt.CommentList):
-            raise Blogit.NoPostException
+            raise utils.NoPostException
         if self.prev_file is None:
             self.prev_file = tempfile.mkstemp('.html', 'blogit')[1]
             f = open(self.prev_file, 'w')

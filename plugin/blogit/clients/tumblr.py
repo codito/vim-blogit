@@ -51,5 +51,5 @@ class TumblrPostListingPosts(blogclient.AbstractPostListingSource):
         #return WordPressPage(id, vim_vars=self.vim_vars)
 
 
-class TumblrBlogPost(blogpost.BlogPost):
+class TumblrBlogPost(blogpost.AbstractBlogPost):
     pass

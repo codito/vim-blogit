@@ -86,7 +86,7 @@ class WordPressPostListingPages(blogclient.AbstractPostListingSource):
         return WordPressPage(id, vim_vars=self.vim_vars)
 
 
-class WordPressBlogPost(blogpost.BlogPost):
+class WordPressBlogPost(blogpost.AbstractBlogPost):
 
     def __init__(self, blog_post_id, post_data={}, meta_data_dict=None,
                  headers=None, post_body='description', vim_vars=None,
@@ -189,26 +189,41 @@ class WordPressBlogPost(blogpost.BlogPost):
         d['blogit_status'] = comments
         self.post_data = d
 
-    @classmethod
-    def create_new_post(cls, vim_vars, body_lines=['']):
-        """
-        >>> mock('vim.command', tracker=None)
-        >>> mock('vim.mocked_eval', tracker=None)
-        >>> WordPressBlogPost.create_new_post(utils.VimVars())     #doctest: +ELLIPSIS
-        time data '' does not match format '%Y%m%dT%H:%M:%S'
-        <blogit.clients.wordpress.WordPressBlogPost object at 0x...>
-        >>> minimock.restore()
-        """
-        b = cls('', post_data={'post_status': 'draft', 'description': '', 'wp_author_display_name':
-                               vim_vars.blog_username, 'postid': '', 'categories': [],
-                               'mt_keywords': '', 'date_created_gmt': '', 'title': '',
-                               'Status_AS_dict': {'awaiting_moderation': 0, 'spam': 0,
-                                                  'post_status': 'draft', 'total_comments': 0, }},
-                vim_vars=vim_vars)
-        b.init_vim_buffer()
-        if body_lines != ['']:
-            vim.current.buffer[-1:] = body_lines
-        return b
+    def get_headers(self):
+        """Returns the metadata dictionary mapping for the server. Must be implemented by client."""
+        return ['Id',
+                'Subject',
+                'Date',
+                'Draft',    # True if the post is a draft. Default: True
+                'Private',  # True if the post should be private. Default: False
+                'Autopost', # True if you'd like posterous to post to twitter etc.. Default: False
+                'Tags'
+               ]
+
+    def get_meta_data_dict(self):
+        """Returns the metadata dictionary mapping for the server. Must be implemented by client."""
+        return {'Id': 'id',
+                'Subject': 'title',
+                'Tags': 'tags',
+                'Date_AS_DateTime': 'display_date',
+                'Draft': 'draft',
+                'Private': 'is_private',
+                'Autopost': 'autopost',
+               }
+
+    def get_post_data(self):
+        """Returns the post_data mapping for the server. Must be implemented by client."""
+        return {'post_status': 'draft',
+                'description': '',
+                'wp_author_display_name': vim_vars.blog_username,
+                'postid': '',
+                'categories': [],
+                'mt_keywords': '',
+                'date_created_gmt': '',
+                'title': '',
+                'Status_AS_dict': {'awaiting_moderation': 0, 'spam': 0, 'post_status': 'draft',
+                                   'total_comments': 0}
+               }
 
 
 class WordPressPage(blogpost.Page):

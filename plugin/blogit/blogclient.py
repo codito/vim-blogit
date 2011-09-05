@@ -41,15 +41,30 @@ class AbstractBlogClient(object):
             blog_type = posterous.PosterousBlogClient
         return object.__new__(blog_type)
 
-    def create_new_post(self, post_content=[''], post_type=None):
-        """Creates a new blog post. Must be implemented by derived clients."""
-        raise NotImplementedError("create_new_post is not implemented in %s" % str(self))
+    def create_post(self, post_data={}):
+        """Creates a new blog post. Returns the post id. Params:
+            - post_data: dictionary of key, value to be sent to server
+        Must be implemented by clients."""
+        raise NotImplementedError("create_post is not implemented in %s" % str(self))
+
+    def edit_post(self, post_id, post_data={}):
+        """Edits and saves a blog post. Params:
+            - post_id: the Id of the post being edited
+            - post_data: dictionary of key, value to be sent to server
+        Must be implemented by clients."""
+        raise NotImplementedError("edit_post is not implemented in %s" % str(self))
 
     def get_date_format(self):
         """Returns the date format for Posts, Pages etc. Default format is suitable for
         Metaweblog and Wordpress.
         """
         return '%Y%m%dT%H:%M:%S'
+
+    def get_post(self, post_id):
+        """Gets a blog post. Returns the dictionary of key, values for this post. Params:
+            - post_id: the Id of the post being edited
+        Must be implemented by clients."""
+        raise NotImplementedError("get_post is not implemented in %s" % str(self))
 
     def get_post_groups(self):
         """Returns the post types supported by this blog client."""
@@ -61,6 +76,12 @@ class AbstractBlogClient(object):
         """
         raise NotImplementedError("get_posts is not implemented in %s" % str(self))
 
+    def get_tags(self):
+        """Gets a blog's tags. Returns the dictionary of key, values for this post. Params:
+            - post_id: the Id of the post being edited
+        Must be implemented by clients."""
+        raise NotImplementedError("get_tags is not implemented in %s" % str(self))
+
     def _get_post_group_types(self):
         """Gets a tuple of types of posts supported by the blog. Must be implemented by derived
         clients.
@@ -68,12 +89,16 @@ class AbstractBlogClient(object):
         raise NotImplementedError("_get_post_group_types is not implemented in %s" % str(self))
 
     def _http_get_request(self, url, params, headers={}):
+        print "\nGET: "
+        print params
         data = urllib.urlencode(params)
         url = url + "?" + data
         req = urllib2.Request(url)
         return self._http_request(req, headers)
 
     def _http_post_request(self, url, params, headers={}):
+        print "\nPOST:"
+        print params
         data = urllib.urlencode(params)
         req = urllib2.Request(url, data)
         return self._http_request(req, headers)
@@ -82,21 +107,27 @@ class AbstractBlogClient(object):
         [req.add_header(k, v) for k, v in headers.iteritems()]
         try:
             ret = urllib2.urlopen(req)
-            return ret.read()
+            x = ret.read()
+            print x
+            return x
         except urllib2.HTTPError, e:
             print e.read()
             raise e
-        pass
 
 class AbstractBufferIO(object):
     """Wraps common IO interactions on a vim buffer."""
-    def refresh_vim_buffer(self):
-        vim.current.buffer[:] = [utils.encode_to_utf(line) for line in self.display()]
-        vim.command('setlocal nomodified')
+
+    def display(self):
+        """Returns the lines in buffer after conversion using meta_data_dict/headers."""
+        raise NotImplementedError("Must be implemented by derived class.")
 
     def init_vim_buffer(self):
         vim.command('setlocal encoding=utf-8')
         self.refresh_vim_buffer()
+
+    def refresh_vim_buffer(self):
+        vim.current.buffer[:] = [utils.encode_to_utf(line) for line in self.display()]
+        vim.command('setlocal nomodified')
 
     def read_post(self, lines):
         raise NotImplementedError("Must be implemented by derived class.")
